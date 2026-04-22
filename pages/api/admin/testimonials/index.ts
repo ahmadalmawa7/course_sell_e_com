@@ -7,7 +7,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const collection = db.collection('testimonials');
 
     if (req.method === 'GET') {
-      const items = await collection.find({}).sort({ createdAt: -1 }).toArray();
+      const { status } = req.query;
+      const query = status ? { status } : {};
+      const items = await collection.find(query).sort({ createdAt: -1 }).toArray();
       const mapped = items.map((i: any) => ({
         id: i._id?.toString(),
         userId: i.userId || null,

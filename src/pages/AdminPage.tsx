@@ -81,6 +81,9 @@ const AdminPage = () => {
   const [loadingPendingArticles, setLoadingPendingArticles] = useState(false);
   const [loadingApprovedArticles, setLoadingApprovedArticles] = useState(false);
   const [viewArticleImage, setViewArticleImage] = useState<{ url: string; title: string } | null>(null);
+  const [pendingTestimonials, setPendingTestimonials] = useState<any[]>([]);
+  const [hasSeenTestimonials, setHasSeenTestimonials] = useState(false);
+  const [lastSeenTestimonialCount, setLastSeenTestimonialCount] = useState(0);
 
   useEffect(() => {
     const fetchPendingArticles = async () => {
@@ -111,6 +114,34 @@ const AdminPage = () => {
 
     return () => clearInterval(interval);
   }, [activeTab]);
+
+  // Fetch pending testimonials count for sidebar notification
+  useEffect(() => {
+    const fetchPendingTestimonials = async () => {
+      try {
+        const res = await fetch('/api/admin/testimonials?status=pending');
+        if (res.ok) {
+          const data = await res.json();
+          // Only show dot if there are MORE pending testimonials than last seen
+          if (data.length > lastSeenTestimonialCount) {
+            setHasSeenTestimonials(false);
+          }
+          setPendingTestimonials(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch pending testimonials count', err);
+      }
+    };
+
+    fetchPendingTestimonials();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchPendingTestimonials();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [lastSeenTestimonialCount]);
 
   useEffect(() => {
     const fetchAdminTestimonials = async () => {
@@ -807,6 +838,11 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('adminActiveTab', activeTab);
     }
+    // Mark testimonials as seen when admin clicks on the testimonials tab
+    if (activeTab === 'testimonials') {
+      setHasSeenTestimonials(true);
+      setLastSeenTestimonialCount(pendingTestimonials.length);
+    }
   }, [activeTab]);
 
   return (
@@ -826,6 +862,9 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                 {id === 'article-requests' && pendingArticles.length > 0 && (
                   <span className="flex h-2 w-2 rounded-full bg-green-500" />
                 )}
+                {id === 'testimonials' && pendingTestimonials.length > lastSeenTestimonialCount && !hasSeenTestimonials && (
+                  <span className="flex h-2 w-2 rounded-full bg-green-500" />
+                )}
               </button>
             ))}
           </nav>
@@ -839,6 +878,9 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                 <Icon className="h-3 w-3" />
                 <span>{label}</span>
                 {id === 'article-requests' && pendingArticles.length > 0 && (
+                  <span className="flex h-2 w-2 rounded-full bg-green-500" />
+                )}
+                {id === 'testimonials' && pendingTestimonials.length > lastSeenTestimonialCount && !hasSeenTestimonials && (
                   <span className="flex h-2 w-2 rounded-full bg-green-500" />
                 )}
               </button>
