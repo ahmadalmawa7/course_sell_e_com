@@ -306,37 +306,43 @@ const CoursesPage = () => {
 
                     </Link>
 
-                    <Button
-
-                      onClick={() => isUserEnrolled ? navigate(`/courses/${course.id}`) : handleEnroll(course.id)}
-
-                      disabled={enrollingCourseId === course.id}
-
-                      className="mt-4 w-full bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all"
-
-                    >
-
-                      {enrollingCourseId === course.id ? (
-
-                        <>
-
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-
-                          Enrolling...
-
-                        </>
-
-                      ) : isUserEnrolled ? (
-
-                        'Continue Learning'
-
+                    {/* Action Buttons */}
+                    <div className="mt-4 flex gap-2">
+                      {isUserEnrolled ? (
+                        // Enrolled: Show Continue Learning button that opens course detail
+                        <Button
+                          onClick={() => navigate(`/courses/${course.id}`)}
+                          className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all"
+                        >
+                          Continue Learning
+                        </Button>
                       ) : (
-
-                        'Enroll Now'
-
+                        // Not Enrolled: Show Enroll Now + View Course buttons
+                        <>
+                          <Button
+                            onClick={() => handleEnroll(course.id)}
+                            disabled={enrollingCourseId === course.id}
+                            className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all"
+                          >
+                            {enrollingCourseId === course.id ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Enrolling...
+                              </>
+                            ) : (
+                              'Enroll Now'
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => navigate(`/courses/${course.id}`)}
+                            className="flex-1 border-primary text-primary hover:bg-primary/10 font-semibold transition-all"
+                          >
+                            View Course
+                          </Button>
+                        </>
                       )}
-
-                    </Button>
+                    </div>
 
                   </div>
 

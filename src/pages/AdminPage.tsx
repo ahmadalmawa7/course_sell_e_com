@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useData } from '@/contexts/DataContext';
@@ -69,6 +69,10 @@ const AdminPage = () => {
   const [noteFileUploading, setNoteFileUploading] = useState(false);
   const [noteFileName, setNoteFileName] = useState('');
   const [supportReply, setSupportReply] = useState<{ ticketId: string; text: string } | null>(null);
+  const [students, setStudents] = useState<any[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [studentsError, setStudentsError] = useState<string | null>(null);
   const [settings, setSettings] = useState({ razorpayKeyId: '', razorpayKeySecret: '', smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', smtpFrom: 'noreply@eruditioninfinite.com' });
 
   useEffect(() => {
@@ -77,6 +81,30 @@ const AdminPage = () => {
       setNoteForm((prev) => ({ ...prev, category: prev.category || defaultCategory || '' }));
     }
   }, [categories]);
+
+  useEffect(() => {
+    if (activeTab !== 'students') return;
+
+    const fetchStudents = async () => {
+      setLoadingStudents(true);
+      setStudentsError(null);
+      try {
+        const response = await fetch('/api/users');
+        if (!response.ok) {
+          throw new Error(`Unable to load students: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setStudents(data.users || []);
+      } catch (error) {
+        console.error('Failed to fetch student data:', error);
+        setStudentsError(error instanceof Error ? error.message : 'Failed to fetch student data.');
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+
+    fetchStudents();
+  }, [activeTab]);
   const [pendingArticles, setPendingArticles] = useState<any[]>([]);
   const [loadingPendingArticles, setLoadingPendingArticles] = useState(false);
   const [loadingApprovedArticles, setLoadingApprovedArticles] = useState(false);
@@ -1100,29 +1128,47 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
             {activeTab === 'students' && (
               <div>
                 <h2 className="mb-6 font-heading text-2xl font-bold text-foreground">Student Management</h2>
-                <div className="rounded-lg border border-border bg-card overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted"><tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Email</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Courses</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
-                    </tr></thead>
-                    <tbody>{[
-                      { name: 'Arjun Mehta', email: 'arjun@email.com', courses: 3, status: 'Active' },
-                      { name: 'Priya Sharma', email: 'priya@email.com', courses: 1, status: 'Active' },
-                      { name: 'Rahul Verma', email: 'rahul@email.com', courses: 1, status: 'Active' },
-                      { name: 'Neha Gupta', email: 'neha@email.com', courses: 1, status: 'Pending' },
-                      { name: 'Vikram Singh', email: 'vikram@email.com', courses: 2, status: 'Active' },
-                    ].map((s, i) => (
-                      <tr key={i} className="border-t border-border">
-                        <td className="px-4 py-2 font-medium text-card-foreground">{s.name}</td>
-                        <td className="px-4 py-2 text-muted-foreground">{s.email}</td>
-                        <td className="px-4 py-2 text-card-foreground">{s.courses}</td>
-                        <td className="px-4 py-2"><span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.status}</span></td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
+                <div className="rounded-lg border border-border bg-card overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted"><tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Email</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Contact No</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Courses Enrolled</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">View Enrolled Courses</th>
+                      </tr></thead>
+                      <tbody>
+                        {loadingStudents ? (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Loading students...</td>
+                          </tr>
+                        ) : studentsError ? (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-6 text-center text-destructive">{studentsError}</td>
+                          </tr>
+                        ) : students.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No student records found.</td>
+                          </tr>
+                        ) : (
+                          students.map((student) => (
+                            <tr key={student.id} className="border-t border-border bg-background">
+                              <td className="px-4 py-3 font-medium text-card-foreground">{student.name}</td>
+                              <td className="px-4 py-3 text-muted-foreground">{student.email}</td>
+                              <td className="px-4 py-3 text-card-foreground">{student.phone || '—'}</td>
+                              <td className="px-4 py-3 font-medium text-card-foreground">{student.enrolledCount}</td>
+                              <td className="px-4 py-3">
+                                <Button size="sm" className="h-8 px-3" onClick={() => setSelectedStudent(student)}>
+                                  View Enrolled Courses
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -1624,6 +1670,35 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
           </div>
           <div className="mt-4 flex justify-end">
             <Button size="sm" onClick={() => setViewCourse(null)}>Close</Button>
+          </div>
+        </DialogOverlay>
+      )}
+      {selectedStudent && (
+        <DialogOverlay onClose={() => setSelectedStudent(null)}>
+          <h3 className="font-heading text-lg font-semibold text-card-foreground mb-4">Enrolled Courses for {selectedStudent.name}</h3>
+          <p className="text-sm text-muted-foreground mb-4">Total enrolled courses: {selectedStudent.courses.length}</p>
+          {selectedStudent.courses.length > 0 ? (
+            <div className="grid gap-3">
+              {selectedStudent.courses.map((course: any) => (
+                <div key={course.id} className="rounded-lg border border-border bg-card p-4">
+                  <div className="text-sm font-semibold text-card-foreground mb-2">{course.title}</div>
+                  <div className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                    course.status === 'Completed'
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : course.status === 'In Progress'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-slate-100 text-slate-700'
+                  }`}>
+                    {course.status}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No enrolled courses found for this student.</p>
+          )}
+          <div className="mt-4 flex justify-end">
+            <Button size="sm" onClick={() => setSelectedStudent(null)}>Close</Button>
           </div>
         </DialogOverlay>
       )}
