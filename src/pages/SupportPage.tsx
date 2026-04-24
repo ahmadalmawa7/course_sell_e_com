@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 
 const SupportPage = () => {
   const { user } = useAuth();
-  const { supportTickets, addSupportTicket, addSupportMessage } = useData();
+  const { supportTickets, addSupportTicket, addSupportMessage, courses } = useData();
   const [showNew, setShowNew] = useState(false);
   const [newForm, setNewForm] = useState({ subject: '', message: '' });
   const [activeTicket, setActiveTicket] = useState<string | null>(null);
@@ -84,17 +84,20 @@ const SupportPage = () => {
                     <p className="font-medium text-card-foreground text-sm">{t.subject}</p>
                     <span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${t.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>{t.status}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{t.date} • {t.messages.length} messages</p>
+                  <p className="text-xs text-muted-foreground">{t.date} {t.time ? `• ${t.time}` : ''} • {t.messages.length} messages</p>
+                  {t.enrolledCourses && t.enrolledCourses.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">Enrolled: {t.enrolledCourses.map((cid: string) => courses.find(c => c.id === cid || c._id === cid)?.title || cid).filter(Boolean).join(', ')}</p>
+                  )}
                 </button>
               ))}
             </div>
 
             <div className="md:col-span-2">
-              {active ? (
+                  {active ? (
                 <div className="rounded-lg border border-border bg-card overflow-hidden">
                   <div className="border-b border-border p-4">
                     <h3 className="font-heading text-base font-semibold text-card-foreground">{active.subject}</h3>
-                    <p className="text-xs text-muted-foreground">{active.date}</p>
+                    <p className="text-xs text-muted-foreground">{active.date} {active.time ? `• ${active.time}` : ''}</p>
                   </div>
                   <div className="p-4 space-y-3 max-h-80 overflow-y-auto">
                     {active.messages.map((m, i) => (

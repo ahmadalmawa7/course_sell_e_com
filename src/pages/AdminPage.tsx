@@ -69,7 +69,38 @@ const AdminPage = () => {
   const [noteFileUploading, setNoteFileUploading] = useState(false);
   const [noteFileName, setNoteFileName] = useState('');
   const [supportReply, setSupportReply] = useState<{ ticketId: string; text: string } | null>(null);
+  const [adminTickets, setAdminTickets] = useState<any[]>([]);
+  const [loadingAdminTickets, setLoadingAdminTickets] = useState(false);
   const [settings, setSettings] = useState({ razorpayKeyId: '', razorpayKeySecret: '', smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', smtpFrom: 'noreply@eruditioninfinite.com' });
+  const [students, setStudents] = useState<any[]>([]);
+  const [loadingStudents, setLoadingStudents] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
+
+  // Fetch students data when students tab is active
+  useEffect(() => {
+    const fetchStudents = async () => {
+      if (activeTab !== 'students') return;
+      
+      try {
+        setLoadingStudents(true);
+        const response = await fetch('/api/admin/users');
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && Array.isArray(data.users)) {
+            setStudents(data.users);
+          }
+        } else {
+          console.error('Failed to fetch students');
+        }
+      } catch (error) {
+        console.error('Error fetching students:', error);
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+
+    fetchStudents();
+  }, [activeTab]);
 
   useEffect(() => {
     if (categories.length > 0) {
@@ -166,6 +197,44 @@ const AdminPage = () => {
     };
 
     fetchAdminTestimonials();
+  }, [activeTab]);
+
+  // Load admin support tickets when viewing support tab
+  useEffect(() => {
+    const fetchTickets = async () => {
+      if (activeTab !== 'support') return;
+      setLoadingAdminTickets(true);
+      try {
+        const resp = await fetch('/api/support/all');
+        if (!resp.ok) {
+          setAdminTickets([]);
+          return;
+        }
+        const data = await resp.json();
+        if (data.success && Array.isArray(data.tickets)) {
+          const mapped = data.tickets.map((t: any) => ({
+            id: t._id || t.id,
+            userId: t.userId || '',
+            userName: t.userName || '',
+            subject: t.subject || '',
+            description: t.description || '',
+            status: t.status || 'open',
+            date: t.createdAt ? (new Date(t.createdAt)).toISOString().split('T')[0] : '',
+            messages: Array.isArray(t.messages) ? t.messages.map((m: any) => ({ sender: m.sender === 'admin' ? 'admin' : 'user', text: m.message || m.text || '', date: m.createdAt ? (new Date(m.createdAt)).toISOString().split('T')[0] : '' })) : [],
+          }));
+          setAdminTickets(mapped);
+        } else {
+          setAdminTickets([]);
+        }
+      } catch (err) {
+        console.error('Failed to fetch admin tickets', err);
+        setAdminTickets([]);
+      } finally {
+        setLoadingAdminTickets(false);
+      }
+    };
+
+    fetchTickets();
   }, [activeTab]);
 
   useEffect(() => {
@@ -699,11 +768,65 @@ const AdminPage = () => {
     }
   };
 
-  const handleSupportReply = () => {
+  const handleSupportReply = async () => {
     if (!supportReply?.text) return;
-    addSupportMessage(supportReply.ticketId, { sender: 'admin', text: supportReply.text, date: new Date().toISOString().split('T')[0] });
-    toast.success('Reply sent!');
-    setSupportReply(null);
+    try {
+      const resp = await fetch(`/api/support/reply/${supportReply.ticketId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: 'admin', message: supportReply.text }) });
+      if (!resp.ok) throw new Error('Failed to send reply');
+      const data = await resp.json();
+      if (data.success && data.ticket) {
+        const tk = data.ticket;
+        const mapped = {
+          id: tk._id || tk.id,
+          userId: tk.userId || '',
+          userName: tk.userName || '',
+          subject: tk.subject || '',
+          description: tk.description || '',
+          status: tk.status || 'open',
+          date: tk.createdAt ? (new Date(tk.createdAt)).toISOString().split('T')[0] : '',
+          messages: Array.isArray(tk.messages) ? tk.messages.map((m: any) => ({ sender: m.sender === 'admin' ? 'admin' : 'user', text: m.message || m.text || '', date: m.createdAt ? (new Date(m.createdAt)).toISOString().split('T')[0] : '' })) : [],
+        };
+        setAdminTickets(prev => prev.map(t => t.id === mapped.id ? mapped : t));
+        toast.success('Reply sent!');
+        setSupportReply(null);
+      } else {
+        throw new Error('Invalid response');
+      }
+    } catch (err) {
+      console.error('Reply error', err);
+      toast.error('Failed to send reply');
+    }
+  };
+
+  const handleDeleteTicket = async (ticketId: string) => {
+    if (!confirm('Delete this ticket?')) return;
+    try {
+      const resp = await fetch(`/api/support/admin/${ticketId}`, { method: 'DELETE' });
+      if (!resp.ok) throw new Error('Delete failed');
+      setAdminTickets(prev => prev.filter(t => t.id !== ticketId));
+      toast.success('Ticket deleted');
+    } catch (err) {
+      console.error('Delete ticket error', err);
+      toast.error('Failed to delete ticket');
+    }
+  };
+
+  const toggleTicketStatus = async (ticketId: string) => {
+    try {
+      const t = adminTickets.find(a => a.id === ticketId);
+      if (!t) return;
+      const newStatus = t.status === 'open' ? 'closed' : 'open';
+      const resp = await fetch(`/api/support/admin/${ticketId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: newStatus }) });
+      if (!resp.ok) throw new Error('Update failed');
+      const data = await resp.json();
+      if (data.success && data.ticket) {
+        setAdminTickets(prev => prev.map(a => a.id === ticketId ? { ...a, status: data.ticket.status } : a));
+        toast.success('Ticket updated');
+      }
+    } catch (err) {
+      console.error('Toggle status error', err);
+      toast.error('Failed to update ticket');
+    }
   };
 
   const handleApproveArticle = async (articleId: string) => {
@@ -1099,31 +1222,140 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
             {/* STUDENTS */}
             {activeTab === 'students' && (
               <div>
-                <h2 className="mb-6 font-heading text-2xl font-bold text-foreground">Student Management</h2>
-                <div className="rounded-lg border border-border bg-card overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted"><tr>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Name</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Email</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Courses</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
-                    </tr></thead>
-                    <tbody>{[
-                      { name: 'Arjun Mehta', email: 'arjun@email.com', courses: 3, status: 'Active' },
-                      { name: 'Priya Sharma', email: 'priya@email.com', courses: 1, status: 'Active' },
-                      { name: 'Rahul Verma', email: 'rahul@email.com', courses: 1, status: 'Active' },
-                      { name: 'Neha Gupta', email: 'neha@email.com', courses: 1, status: 'Pending' },
-                      { name: 'Vikram Singh', email: 'vikram@email.com', courses: 2, status: 'Active' },
-                    ].map((s, i) => (
-                      <tr key={i} className="border-t border-border">
-                        <td className="px-4 py-2 font-medium text-card-foreground">{s.name}</td>
-                        <td className="px-4 py-2 text-muted-foreground">{s.email}</td>
-                        <td className="px-4 py-2 text-card-foreground">{s.courses}</td>
-                        <td className="px-4 py-2"><span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${s.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{s.status}</span></td>
-                      </tr>
-                    ))}</tbody>
-                  </table>
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="font-heading text-2xl font-bold text-foreground">Student Management</h2>
+                  <span className="text-sm text-muted-foreground">Total Students: {students.length}</span>
                 </div>
+                {loadingStudents ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : students.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-card p-8 text-center">
+                    <p className="text-muted-foreground">No students found</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-border bg-card overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Email</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Contact</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Courses Enrolled</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Course Details</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {students.map((student) => (
+                            <tr key={student.id} className="border-t border-border hover:bg-muted/50">
+                              <td className="px-4 py-3 font-medium text-card-foreground">{student.name}</td>
+                              <td className="px-4 py-3 text-muted-foreground">{student.email}</td>
+                              <td className="px-4 py-3 text-muted-foreground">{student.phone}</td>
+                              <td className="px-4 py-3 text-card-foreground">{student.enrolledCoursesCount}</td>
+                              <td className="px-4 py-3">
+                                {student.enrolledCourses.length > 0 ? (
+                                  <div className="space-y-1">
+                                    {student.enrolledCourses.slice(0, 2).map((course: any, idx: number) => (
+                                      <div key={idx} className="flex items-center gap-2">
+                                        <span className="text-xs text-card-foreground truncate max-w-[150px]">{course.courseName}</span>
+                                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                          course.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                          course.status === 'Pursuing' ? 'bg-blue-100 text-blue-700' :
+                                          'bg-yellow-100 text-yellow-700'
+                                        }`}>{course.status}</span>
+                                      </div>
+                                    ))}
+                                    {student.enrolledCourses.length > 2 && (
+                                      <span className="text-xs text-muted-foreground">+{student.enrolledCourses.length - 2} more</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">No courses</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`rounded-sm px-2 py-1 text-xs font-medium ${
+                                  student.status === 'Active' ? 'bg-green-100 text-green-700' :
+                                  student.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
+                                  student.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>{student.status}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedStudent(student)}>
+                                  <Eye className="h-3 w-3 mr-1" /> View
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Student Details Dialog */}
+                {selectedStudent && (
+                  <DialogOverlay onClose={() => setSelectedStudent(null)}>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-heading text-xl font-bold">Student Details</h3>
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedStudent(null)}><X className="h-4 w-4" /></Button>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-xs text-muted-foreground">Name</p>
+                            <p className="font-medium">{selectedStudent.name}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Email</p>
+                            <p className="font-medium">{selectedStudent.email}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Contact</p>
+                            <p className="font-medium">{selectedStudent.phone}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground">Joined</p>
+                            <p className="font-medium">{selectedStudent.createdAt ? new Date(selectedStudent.createdAt).toLocaleDateString() : 'N/A'}</p>
+                          </div>
+                        </div>
+                        <div className="border-t border-border pt-3">
+                          <p className="text-sm font-medium mb-2">Enrolled Courses ({selectedStudent.enrolledCoursesCount})</p>
+                          {selectedStudent.enrolledCourses.length > 0 ? (
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                              {selectedStudent.enrolledCourses.map((course: any, idx: number) => (
+                                <div key={idx} className="rounded bg-muted p-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">{course.courseName}</span>
+                                    <span className={`text-xs px-2 py-0.5 rounded ${
+                                      course.status === 'Completed' ? 'bg-green-100 text-green-700' :
+                                      course.status === 'Pursuing' ? 'bg-blue-100 text-blue-700' :
+                                      'bg-yellow-100 text-yellow-700'
+                                    }`}>{course.status}</span>
+                                  </div>
+                                  <div className="mt-1 flex items-center gap-2">
+                                    <div className="flex-1 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                                      <div className="h-full bg-primary rounded-full" style={{ width: `${course.progress}%` }} />
+                                    </div>
+                                    <span className="text-xs text-muted-foreground">{course.progress}%</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">No courses enrolled</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </DialogOverlay>
+                )}
               </div>
             )}
 
@@ -1521,18 +1753,22 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
               <div>
                 <h2 className="mb-6 font-heading text-2xl font-bold text-foreground">Support Tickets</h2>
                 <div className="space-y-3">
-                  {supportTickets.map(t => (
-                    <div key={t.id} className="rounded-lg border border-border bg-card p-4">
+                  {loadingAdminTickets ? (
+                    <div className="text-sm text-muted-foreground">Loading tickets...</div>
+                  ) : (
+                    adminTickets.map(t => (
+                      <div key={t.id} className="rounded-lg border border-border bg-card p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div>
                           <p className="font-medium text-card-foreground">{t.subject}</p>
                           <p className="text-xs text-muted-foreground">{t.userName} • {t.date}</p>
                         </div>
-                        <div className="flex gap-1">
+                        <div className="flex gap-2 items-center">
                           <span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${t.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>{t.status}</span>
                           {t.status === 'open' && (
                             <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { closeSupportTicket(t.id); toast.success('Ticket closed.'); }}>Close</Button>
                           )}
+                          <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleDeleteTicket(t.id)}><Trash2 className="h-3 w-3 mr-1" /> Delete</Button>
                         </div>
                       </div>
                       <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
@@ -1543,19 +1779,24 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                           </div>
                         ))}
                       </div>
-                      {t.status === 'open' && (
-                        supportReply?.ticketId === t.id ? (
-                          <div className="flex gap-2">
-                            <Input value={supportReply.text} onChange={e => setSupportReply({ ...supportReply, text: e.target.value })} placeholder="Type reply..." onKeyDown={e => e.key === 'Enter' && handleSupportReply()} />
-                            <Button size="sm" onClick={handleSupportReply}><Send className="h-4 w-4" /></Button>
-                            <Button variant="outline" size="sm" onClick={() => setSupportReply(null)}>Cancel</Button>
-                          </div>
-                        ) : (
-                          <Button variant="outline" size="sm" className="text-xs" onClick={() => setSupportReply({ ticketId: t.id, text: '' })}><Reply className="h-3 w-3 mr-1" /> Reply</Button>
-                        )
-                      )}
+                          {t.status === 'open' && (
+                            supportReply?.ticketId === t.id ? (
+                              <div className="flex gap-2">
+                                <Input value={supportReply.text} onChange={e => setSupportReply({ ...supportReply, text: e.target.value })} placeholder="Type reply..." onKeyDown={e => e.key === 'Enter' && handleSupportReply()} />
+                                <Button size="sm" onClick={handleSupportReply}><Send className="h-4 w-4" /></Button>
+                                <Button variant="outline" size="sm" onClick={() => setSupportReply(null)}>Cancel</Button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Button variant="outline" size="sm" className="text-xs" onClick={() => setSupportReply({ ticketId: t.id, text: '' })}><Reply className="h-3 w-3 mr-1" /> Reply</Button>
+                                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleTicketStatus(t.id)}>{t.status === 'open' ? 'Mark Closed' : 'Reopen'}</Button>
+                                <Button variant="destructive" size="sm" className="h-7 text-xs" onClick={() => handleDeleteTicket(t.id)}><Trash2 className="h-3 w-3 mr-1" /> Delete</Button>
+                              </div>
+                            )
+                          )}
                     </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}

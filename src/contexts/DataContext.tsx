@@ -683,6 +683,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
+
     if (!isAdmin || !user?.email) return;
 
 
@@ -776,6 +777,51 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
   };
+
+  // Load support tickets for the authenticated user
+  useEffect(() => {
+    const fetchSupportTickets = async () => {
+      if (!user?.id) {
+        setSupportTickets([]);
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/api/support/user-tickets/${user.id}`);
+        if (!resp.ok) {
+          setSupportTickets([]);
+          return;
+        }
+        const data = await resp.json();
+        if (!data.success || !Array.isArray(data.tickets)) {
+          setSupportTickets([]);
+          return;
+        }
+
+        const mapped = data.tickets.map((t: any) => {
+          const created = t.createdAt ? new Date(t.createdAt) : new Date();
+          return ({
+            id: t._id || t.id,
+            userId: t.userId || t.userId,
+            userName: t.userName || (user?.name || ''),
+            enrolledCourses: Array.isArray(t.enrolledCourses) ? t.enrolledCourses.map((c: any) => String(c)) : [],
+            subject: t.subject || '',
+            status: t.status || 'open',
+            date: created.toISOString().split('T')[0],
+            time: created.toISOString().split('T')[1].slice(0,8),
+            messages: Array.isArray(t.messages) ? t.messages.map((m: any) => ({ sender: m.sender === 'user' ? 'user' : 'admin', text: m.message || m.text || '', date: m.createdAt ? (new Date(m.createdAt)).toISOString().split('T')[0] : '' })) : [],
+          });
+        });
+
+        setSupportTickets(mapped);
+      } catch (err) {
+        console.error('Failed to fetch support tickets:', err);
+        setSupportTickets([]);
+      }
+    };
+
+    fetchSupportTickets();
+  }, [user?.id]);
 
 
 
@@ -2545,7 +2591,66 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
-      addSupportMessage: (tId, m) => setSupportTickets(p => p.map(t => t.id === tId ? { ...t, messages: [...t.messages, m] } : t)),
+      addSupportTicket: async (t) => {
+        // If user is available, persist to backend; otherwise keep local fallback
+        try {
+          if (user?.id) {
+            const body = { userId: user.id, subject: (t.subject || ''), description: (t.messages && t.messages[0] ? t.messages[0].text : '') };
+            const resp = await fetch('/api/support/create-ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (resp.ok) {
+              const data = await resp.json();
+              if (data.success && data.ticket) {
+                const tk = data.ticket;
+                const mapped = {
+                  id: tk._id || tk.id,
+                  userId: tk.userId || user.id,
+                  userName: user.name || '',
+                  subject: tk.subject || t.subject,
+                  status: tk.status || 'open',
+                  date: tk.createdAt ? (new Date(tk.createdAt)).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                  messages: Array.isArray(tk.messages) ? tk.messages.map((m: any) => ({ sender: m.sender === 'user' ? 'user' : 'admin', text: m.message || m.text || '', date: m.createdAt ? (new Date(m.createdAt)).toISOString().split('T')[0] : '' })) : [],
+                };
+                setSupportTickets(p => [...p, mapped]);
+                return;
+              }
+            }
+          }
+        } catch (err) {
+          console.error('Failed to create support ticket:', err);
+        }
+
+        // Fallback: add locally
+        setSupportTickets(p => [...p, t]);
+      },
+
+      addSupportMessage: async (tId, m) => {
+        try {
+          // Try to persist message to backend
+          const resp = await fetch(`/api/support/reply/${tId}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sender: m.sender, message: m.text }) });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.success && data.ticket) {
+              const tk = data.ticket;
+              const mapped = {
+                id: tk._id || tk.id,
+                userId: tk.userId || (user?.id || ''),
+                userName: user?.name || '',
+                subject: tk.subject || '',
+                status: tk.status || 'open',
+                date: tk.createdAt ? (new Date(tk.createdAt)).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                messages: Array.isArray(tk.messages) ? tk.messages.map((mm: any) => ({ sender: mm.sender === 'user' ? 'user' : 'admin', text: mm.message || mm.text || '', date: mm.createdAt ? (new Date(mm.createdAt)).toISOString().split('T')[0] : '' })) : [],
+              };
+              setSupportTickets(p => p.map(t => (t.id === mapped.id ? mapped : t)));
+              return;
+            }
+          }
+        } catch (err) {
+          console.error('Failed to send support message:', err);
+        }
+
+        // Fallback: update locally
+        setSupportTickets(p => p.map(t => t.id === tId ? { ...t, messages: [...t.messages, m] } : t));
+      },
 
 
 
