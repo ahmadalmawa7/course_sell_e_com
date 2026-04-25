@@ -71,40 +71,13 @@ const AdminPage = () => {
   const [noteFileName, setNoteFileName] = useState('');
   const [supportReply, setSupportReply] = useState<{ ticketId: string; text: string } | null>(null);
   const [expandedSupportTicketId, setExpandedSupportTicketId] = useState<string | null>(null);
+  const [adminTickets, setAdminTickets] = useState<any[]>([]);
+  const [loadingAdminTickets, setLoadingAdminTickets] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [studentsError, setStudentsError] = useState<string | null>(null);
   const [settings, setSettings] = useState({ razorpayKeyId: '', razorpayKeySecret: '', smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', smtpFrom: 'noreply@eruditioninfinite.com' });
-  const [students, setStudents] = useState<any[]>([]);
-  const [loadingStudents, setLoadingStudents] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
-
-  // Fetch students data when students tab is active
-  useEffect(() => {
-    const fetchStudents = async () => {
-      if (activeTab !== 'students') return;
-      
-      try {
-        setLoadingStudents(true);
-        const response = await fetch('/api/admin/users');
-        if (response.ok) {
-          const data = await response.json();
-          if (data.success && Array.isArray(data.users)) {
-            setStudents(data.users);
-          }
-        } else {
-          console.error('Failed to fetch students');
-        }
-      } catch (error) {
-        console.error('Error fetching students:', error);
-      } finally {
-        setLoadingStudents(false);
-      }
-    };
-
-    fetchStudents();
-  }, [activeTab]);
 
   useEffect(() => {
     if (categories.length > 0) {
