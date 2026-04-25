@@ -11,7 +11,7 @@ import SupportChat from '@/components/SupportChat';
 
 const SupportPage = () => {
   const { user } = useAuth();
-  const { supportTickets, addSupportTicket, addSupportMessage, courses } = useData();
+  const { supportTickets, createSupportTicket, replySupportTicket, courses } = useData();
   const [showNew, setShowNew] = useState(false);
   const [newForm, setNewForm] = useState({ subject: '', message: '' });
   const [activeTicket, setActiveTicket] = useState<string | null>(null);
@@ -22,6 +22,14 @@ const SupportPage = () => {
 
   const myTickets = supportTickets.filter(t => t.userId === user.id);
   const active = myTickets.find(t => t.id === activeTicket) || myTickets[0] || null;
+  const conversationMessages = active
+    ? [
+        ...(active.description
+          ? [{ sender: 'user' as const, text: active.description, date: active.date }]
+          : []),
+        ...active.messages,
+      ]
+    : [];
 
   useEffect(() => {
     if (!activeTicket && myTickets.length > 0) {
@@ -29,33 +37,41 @@ const SupportPage = () => {
     }
   }, [myTickets, activeTicket]);
 
-  const handleCreateTicket = () => {
+  const handleCreateTicket = async () => {
     if (!newForm.subject.trim() || !newForm.message.trim()) {
       toast.error('Please fill all fields.');
       return;
     }
 
-    addSupportTicket({
-      id: `st-${Date.now()}`,
-      userId: user.id,
-      userName: user.name,
-      subject: newForm.subject.trim(),
-      description: newForm.message.trim(),
-      status: 'open',
-      date: new Date().toISOString().split('T')[0],
-      messages: [{ sender: 'user', text: newForm.message.trim(), date: new Date().toISOString().split('T')[0] }],
-    });
+    try {
+      const createdTicket = await createSupportTicket({
+        userId: user.id,
+        userName: user.name,
+        subject: newForm.subject.trim(),
+        description: newForm.message.trim(),
+      });
 
-    setNewForm({ subject: '', message: '' });
-    setShowNew(false);
-    toast.success('Support ticket created.');
+      setNewForm({ subject: '', message: '' });
+      setShowNew(false);
+      setActiveTicket(createdTicket.id);
+      toast.success('Ticket created successfully');
+    } catch (error: any) {
+      console.error('Create ticket error:', error);
+      toast.error(error?.message || 'Failed to create ticket');
+    }
   };
 
-  const handleReply = () => {
+  const handleReply = async () => {
     if (!active || !replyText.trim()) return;
-    addSupportMessage(active.id, { sender: 'user', text: replyText.trim(), date: new Date().toISOString().split('T')[0] });
-    setReplyText('');
-    toast.success('Message sent.');
+
+    try {
+      await replySupportTicket(active.id, replyText.trim(), 'user');
+      setReplyText('');
+      toast.success('Message sent.');
+    } catch (error) {
+      console.error('Support reply error:', error);
+      toast.error('Failed to send message.');
+    }
   };
 
   return (
@@ -158,11 +174,6 @@ const SupportPage = () => {
                     </div>
                   </div>
 
-                  <div className="mt-5 rounded-3xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-slate-700">Description</p>
-                    <p className="mt-2 text-sm text-slate-600">{active.description || 'No description available.'}</p>
-                  </div>
-
                   <div className="mt-5">
                     {isChatHidden ? (
                       <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-slate-600">
@@ -171,7 +182,7 @@ const SupportPage = () => {
                       </div>
                     ) : (
                       <SupportChat
-                        messages={active.messages}
+                        messages={conversationMessages}
                         replyText={replyText}
                         onReplyChange={setReplyText}
                         onSubmit={handleReply}

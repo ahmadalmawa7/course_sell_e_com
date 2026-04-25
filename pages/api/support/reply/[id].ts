@@ -17,10 +17,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       query._id = String(id);
     }
 
-    const newMsg = { sender, message, createdAt: new Date() };
-    const result = await db.collection('feedback').findOneAndUpdate(
+    const newMsg = {
+      sender,
+      text: message,
+      date: new Date().toISOString().split('T')[0],
+      createdAt: new Date(),
+    };
+    const result = await db.collection('support_tickets').findOneAndUpdate(
       query as any,
-      { $push: { messages: newMsg } },
+      { $push: { messages: newMsg }, $set: { updatedAt: new Date() } },
       { returnDocument: 'after' }
     );
 

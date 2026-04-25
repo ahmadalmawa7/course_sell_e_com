@@ -185,15 +185,19 @@ interface DataContextType {
 
 
 
-  addSupportTicket: (t: SupportTicket) => Promise<void>;
+  addSupportTicket: (t: SupportTicket) => void;
+
+  createSupportTicket: (ticket: { userId: string; userName: string; subject: string; description: string }) => Promise<SupportTicket>;
+  replySupportTicket: (ticketId: string, message: string, sender?: 'user' | 'admin') => Promise<void>;
 
 
 
-  addSupportMessage: (ticketId: string, message: { sender: 'user' | 'admin'; text: string; date: string }) => Promise<void>;
+
+  addSupportMessage: (ticketId: string, message: { sender: 'user' | 'admin'; text: string; date: string }) => void;
 
 
 
-  closeSupportTicket: (id: string) => Promise<void>;
+  closeSupportTicket: (id: string) => void;
 
 
 
@@ -710,17 +714,51 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     };
   };
 
+  const createSupportTicket = async (ticket: { userId: string; userName: string; subject: string; description: string }): Promise<SupportTicket> => {
+    const response = await fetch('/api/support/create-ticket', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ticket),
+    });
+
+    const data = await response.json();
+    if (!response.ok || !data.success || !data.ticket) {
+      throw new Error(data.message || 'Failed to create support ticket');
+    }
+
+    const createdTicket = normalizeBackendTicket(data.ticket);
+    setSupportTickets(prev => [...prev, createdTicket]);
+    return createdTicket;
+  };
+
+  const replySupportTicket = async (ticketId: string, message: string, sender: 'user' | 'admin' = 'user'): Promise<void> => {
+    const response = await fetch(`/api/support/reply/${encodeURIComponent(ticketId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sender, message }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success || !data.ticket) {
+      throw new Error(data.message || 'Failed to send support message');
+    }
+    const updatedTicket = normalizeBackendTicket(data.ticket);
+    setSupportTickets(prev => prev.map(t => t.id === updatedTicket.id ? updatedTicket : t));
+  };
+
   const fetchSupportTickets = async (userId?: string, adminFetch = false) => {
     try {
-      const endpoint = adminFetch ? '/api/tickets?admin=true' : `/api/tickets?userId=${encodeURIComponent(userId || '')}`;
+      const endpoint = adminFetch
+        ? '/api/support/all-tickets'
+        : `/api/support/my-tickets?userId=${encodeURIComponent(userId || '')}`;
       const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(adminFetch ? getSupportAdminHeaders() : {}) };
       const response = await fetch(endpoint, { headers });
       if (!response.ok) {
         throw new Error(`Unable to load support tickets: ${response.statusText}`);
       }
       const data = await response.json();
-      if (Array.isArray(data)) {
-        setSupportTickets(data.map(normalizeBackendTicket));
+      const tickets = Array.isArray(data) ? data : data.tickets;
+      if (Array.isArray(tickets)) {
+        setSupportTickets(tickets.map(normalizeBackendTicket));
       }
     } catch (error) {
       console.error('Failed to fetch support tickets:', error);
@@ -848,7 +886,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
       }
 
       try {
-        const resp = await fetch(`/api/support/user-tickets/${user.id}`);
+        const resp = await fetch(`/api/support/my-tickets?userId=${encodeURIComponent(user.id)}`);
         if (!resp.ok) {
           setSupportTickets([]);
           return;
@@ -859,22 +897,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        const mapped = data.tickets.map((t: any) => {
-          const created = t.createdAt ? new Date(t.createdAt) : new Date();
-          return ({
-            id: t._id || t.id,
-            userId: t.userId || t.userId,
-            userName: t.userName || (user?.name || ''),
-            enrolledCourses: Array.isArray(t.enrolledCourses) ? t.enrolledCourses.map((c: any) => String(c)) : [],
-            subject: t.subject || '',
-            status: t.status || 'open',
-            date: created.toISOString().split('T')[0],
-            time: created.toISOString().split('T')[1].slice(0,8),
-            messages: Array.isArray(t.messages) ? t.messages.map((m: any) => ({ sender: m.sender === 'user' ? 'user' : 'admin', text: m.message || m.text || '', date: m.createdAt ? (new Date(m.createdAt)).toISOString().split('T')[0] : '' })) : [],
-          });
-        });
-
-        setSupportTickets(mapped);
+        setSupportTickets(data.tickets.map(normalizeBackendTicket));
       } catch (err) {
         console.error('Failed to fetch support tickets:', err);
         setSupportTickets([]);
@@ -2681,6 +2704,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
       addSupportTicket: (t) => setSupportTickets(p => [...p, t]),
 
+      createSupportTicket,
+      replySupportTicket,
+
 
 
       addSupportMessage: (tId, m) => setSupportTickets(p => p.map(t => t.id === tId ? { ...t, messages: [...t.messages, m] } : t)),
@@ -2688,6 +2714,10 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
       closeSupportTicket: (id) => setSupportTickets(p => p.map(t => t.id === id ? { ...t, status: 'closed' } : t)),
+
+      updateSupportTicket: async () => {},
+
+      deleteSupportTicket: async () => {},
 
 
 

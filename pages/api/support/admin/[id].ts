@@ -13,7 +13,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     if (req.method === 'DELETE') {
-      await db.collection('feedback').deleteOne(query as any);
+      await db.collection('support_tickets').deleteOne(query as any);
       return res.status(200).json({ success: true });
     }
 
@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (description !== undefined) update.description = description;
       if (status !== undefined) update.status = status;
       if (Object.keys(update).length === 0) return res.status(400).json({ success: false, message: 'no fields' });
-      const result = await db.collection('feedback').findOneAndUpdate(query as any, { $set: update }, { returnDocument: 'after' });
+      const result = await db.collection('support_tickets').findOneAndUpdate(query as any, { $set: update }, { returnDocument: 'after' });
       if (!result.value) return res.status(404).json({ success: false, message: 'not found' });
       const t = result.value;
       const ticket = { _id: t._id.toString(), userId: t.userId ? t.userId.toString() : null, subject: t.subject, description: t.description, status: t.status, createdAt: t.createdAt instanceof Date ? t.createdAt.toISOString() : t.createdAt, messages: t.messages || [] };

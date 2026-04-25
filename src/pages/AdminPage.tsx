@@ -71,6 +71,7 @@ const AdminPage = () => {
   const [noteFileName, setNoteFileName] = useState('');
   const [supportReply, setSupportReply] = useState<{ ticketId: string; text: string } | null>(null);
   const [expandedSupportTicketId, setExpandedSupportTicketId] = useState<string | null>(null);
+  const [hiddenSupportTickets, setHiddenSupportTickets] = useState<string[]>([]);
   const [adminTickets, setAdminTickets] = useState<any[]>([]);
   const [loadingAdminTickets, setLoadingAdminTickets] = useState(false);
   const [students, setStudents] = useState<any[]>([]);
@@ -78,6 +79,31 @@ const AdminPage = () => {
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [studentsError, setStudentsError] = useState<string | null>(null);
   const [settings, setSettings] = useState({ razorpayKeyId: '', razorpayKeySecret: '', smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', smtpFrom: 'noreply@eruditioninfinite.com' });
+
+  // Fetch students data when students tab is active
+  useEffect(() => {
+    const fetchStudents = async () => {
+      if (activeTab !== 'students') return;
+
+      setLoadingStudents(true);
+      setStudentsError(null);
+      try {
+        const response = await fetch('/api/users');
+        if (!response.ok) {
+          throw new Error(`Unable to load students: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setStudents(data.users || []);
+      } catch (error) {
+        console.error('Failed to fetch student data:', error);
+        setStudentsError(error instanceof Error ? error.message : 'Failed to fetch student data.');
+      } finally {
+        setLoadingStudents(false);
+      }
+    };
+
+    fetchStudents();
+  }, [activeTab]);
 
   useEffect(() => {
     if (categories.length > 0) {
@@ -207,7 +233,7 @@ const AdminPage = () => {
       if (activeTab !== 'support') return;
       setLoadingAdminTickets(true);
       try {
-        const resp = await fetch('/api/support/all');
+        const resp = await fetch('/api/support/all-tickets');
         if (!resp.ok) {
           setAdminTickets([]);
           return;
@@ -807,11 +833,19 @@ const AdminPage = () => {
       const resp = await fetch(`/api/support/admin/${ticketId}`, { method: 'DELETE' });
       if (!resp.ok) throw new Error('Delete failed');
       setAdminTickets(prev => prev.filter(t => t.id !== ticketId));
+      setHiddenSupportTickets(prev => prev.filter(id => id !== ticketId));
+      if (supportReply?.ticketId === ticketId) setSupportReply(null);
       toast.success('Ticket deleted');
     } catch (err) {
       console.error('Delete ticket error', err);
       toast.error('Failed to delete ticket');
     }
+  };
+
+  const toggleTicketHidden = (ticketId: string) => {
+    setHiddenSupportTickets(prev =>
+      prev.includes(ticketId) ? prev.filter(id => id !== ticketId) : [...prev, ticketId]
+    );
   };
 
   const toggleTicketStatus = async (ticketId: string) => {
@@ -824,6 +858,9 @@ const AdminPage = () => {
       const data = await resp.json();
       if (data.success && data.ticket) {
         setAdminTickets(prev => prev.map(a => a.id === ticketId ? { ...a, status: data.ticket.status } : a));
+        if (supportReply?.ticketId === ticketId) {
+          setSupportReply(null);
+        }
         toast.success('Ticket updated');
       }
     } catch (err) {
@@ -1798,35 +1835,47 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                   {supportTickets.map(t => (
                     <div key={t.id} className="rounded-lg border border-border bg-card p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium text-card-foreground">{t.subject}</p>
                           <p className="text-xs text-muted-foreground">{t.userName} • {t.date}</p>
                         </div>
-                        <div className="flex gap-1">
-                          <span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${t.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>{t.status}</span>
-                          {t.status === 'open' && (
-                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { closeSupportTicket(t.id); toast.success('Ticket closed.'); }}>Close</Button>
+                        <div className="flex items-center gap-2">
+                          {t.status === 'open' ? (
+                            <>
+                              <span className="rounded-sm px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">open</span>
+                              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleTicketStatus(t.id)}>Close</Button>
+                            </>
+                          ) : (
+                            <span className="rounded-sm px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-500">closed</span>
                           )}
+                          <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => toggleTicketHidden(t.id)}>
+                            {hiddenSupportTickets.includes(t.id) ? 'Show' : 'Hide'}
+                          </Button>
+                          <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive" onClick={() => handleDeleteTicket(t.id)}>Delete</Button>
                         </div>
                       </div>
-                      <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
-                        {t.messages.map((m, i) => (
-                          <div key={i} className={`rounded-md p-2 text-sm ${m.sender === 'admin' ? 'bg-primary/10 ml-4' : 'bg-muted mr-4'}`}>
-                            <p className="text-xs font-medium text-card-foreground mb-0.5">{m.sender === 'admin' ? 'You (Admin)' : t.userName}</p>
-                            <p className="text-muted-foreground">{m.text}</p>
+                      {hiddenSupportTickets.includes(t.id) ? null : (
+                        <>
+                          <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
+                            {[...(t.description ? [{ sender: 'user', text: t.description, date: t.date }] : []), ...t.messages].map((m, i) => (
+                              <div key={i} className={`rounded-md p-2 text-sm ${m.sender === 'admin' ? 'bg-primary/10 ml-4' : 'bg-muted mr-4'}`}>
+                                <p className="text-xs font-medium text-card-foreground mb-0.5">{m.sender === 'admin' ? 'You (Admin)' : t.userName}</p>
+                                <p className="text-muted-foreground">{m.text}</p>
+                              </div>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                      {t.status === 'open' && (
-                        supportReply?.ticketId === t.id ? (
-                          <div className="flex gap-2">
-                            <Input value={supportReply.text} onChange={e => setSupportReply({ ...supportReply, text: e.target.value })} placeholder="Type reply..." onKeyDown={e => e.key === 'Enter' && handleSupportReply()} />
-                            <Button size="sm" onClick={handleSupportReply}><Send className="h-4 w-4" /></Button>
-                            <Button variant="outline" size="sm" onClick={() => setSupportReply(null)}>Cancel</Button>
-                          </div>
-                        ) : (
-                          <Button variant="outline" size="sm" className="text-xs" onClick={() => setSupportReply({ ticketId: t.id, text: '' })}><Reply className="h-3 w-3 mr-1" /> Reply</Button>
-                        )
+                          {t.status === 'open' && (
+                            supportReply?.ticketId === t.id ? (
+                              <div className="flex gap-2">
+                                <Input value={supportReply.text} onChange={e => setSupportReply({ ...supportReply, text: e.target.value })} placeholder="Type reply..." onKeyDown={e => e.key === 'Enter' && handleSupportReply()} />
+                                <Button size="sm" onClick={handleSupportReply}><Send className="h-4 w-4" /></Button>
+                                <Button variant="outline" size="sm" onClick={() => setSupportReply(null)}>Cancel</Button>
+                              </div>
+                            ) : (
+                              <Button variant="outline" size="sm" className="text-xs" onClick={() => setSupportReply({ ticketId: t.id, text: '' })}><Reply className="h-3 w-3 mr-1" /> Reply</Button>
+                            )
+                          )}
+                        </>
                       )}
                     </div>
                   ))}

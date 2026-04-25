@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const tickets = await db
-      .collection('feedback')
+      .collection('support_tickets')
       .find(query)
       .sort({ createdAt: -1 })
       .toArray();
