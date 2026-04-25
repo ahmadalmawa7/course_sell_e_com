@@ -134,10 +134,52 @@ export interface Payment {
   userId: string;
   courseId: string;
   amount: number;
+  amountInPaise?: number;
   date: string;
-  status: 'completed' | 'pending' | 'failed';
+  status: 'completed' | 'pending' | 'failed' | 'success';
   courseName: string;
   userName: string;
+  userEmail?: string;
+  orderId?: string;
+  paymentId?: string;
+  receiptId?: string;
+  signature?: string;
+  paymentDate?: string;
+  currency?: string;
+}
+
+export interface PaymentReceipt {
+  paymentId: string;
+  orderId: string;
+  receiptId: string;
+  userName: string;
+  userEmail: string;
+  courseName: string;
+  instructor: string;
+  amount: number;
+  currency: string;
+  paymentDate: string;
+  status: string;
+}
+
+export interface RazorpayOrderResponse {
+  success: boolean;
+  orderId: string;
+  amount: number;
+  currency: string;
+  courseName: string;
+  userName: string;
+  userEmail: string;
+  key: string;
+}
+
+export interface RazorpayVerificationResponse {
+  success: boolean;
+  message: string;
+  alreadyEnrolled?: boolean;
+  paymentId: string;
+  orderId: string;
+  user?: User;
 }
 
 export interface Note {

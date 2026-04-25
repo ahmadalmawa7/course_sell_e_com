@@ -43,11 +43,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ success: false, message: 'Already enrolled in this course' });
     }
 
+    // Check if course requires payment (price > 0)
+    const coursePrice = course.price || 0;
+    if (coursePrice > 0) {
+      // Check if user has a successful payment for this course
+      const successfulPayment = await db.collection('payments').findOne({
+        userId: new ObjectId(userId),
+        courseId: new ObjectId(courseId),
+        status: 'success'
+      });
+
+      if (!successfulPayment) {
+        return res.status(403).json({
+          success: false,
+          message: 'Payment required. Please complete the payment to enroll in this course.',
+          requiresPayment: true,
+          coursePrice: coursePrice
+        });
+      }
+    }
+
     // Get total lectures from course
     const totalLectures = course.recordedLectures?.length || 0;
 
+    // Check if there's a successful payment to get payment details
+    const paymentRecord = await db.collection('payments').findOne({
+      userId: new ObjectId(userId),
+      courseId: new ObjectId(courseId),
+      status: 'success'
+    });
+
     // Create enrollment
-    const enrollment = {
+    const enrollment: any = {
       userId: new ObjectId(userId),
       courseId: new ObjectId(courseId),
       status: 'In Progress',
@@ -59,6 +86,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       lastAccessedAt: new Date(),
       certificate: null
     };
+
+    // Add payment details if available
+    if (paymentRecord) {
+      enrollment.paymentStatus = 'success';
+      enrollment.paymentId = paymentRecord.paymentId;
+      enrollment.orderId = paymentRecord.orderId;
+      enrollment.amountPaid = paymentRecord.amount;
+    } else if (coursePrice === 0) {
+      enrollment.paymentStatus = 'success';
+      enrollment.amountPaid = 0;
+    }
 
     await db.collection('enrollments').insertOne(enrollment);
 

@@ -6,6 +6,8 @@ import { useData } from '@/contexts/DataContext';
 
 import { useAuth } from '@/contexts/AuthContext';
 
+import { useRazorpay } from '@/hooks/useRazorpay';
+
 import { Clock, Star, Users, BookOpen, Search, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -21,6 +23,8 @@ const CoursesPage = () => {
   const { courses, categories, isEnrolled, enrollCourse, refetchUserEnrollments } = useData();
 
   const { user } = useAuth();
+
+  const { isLoading: isPaymentLoading, initiatePayment } = useRazorpay();
 
   const navigate = useNavigate();
 
@@ -101,44 +105,93 @@ const CoursesPage = () => {
     }
 
 
+    // Check if user is already enrolled
+
+    const course = courses.find(c => c.id === courseId);
+
+    if (!course) {
+
+      toast.error('Course not found');
+
+      return;
+
+    }
+
+    // Check for free courses (price 0)
+
+    if (course.price === 0) {
+
+      setEnrollingCourseId(courseId);
+
+      try {
+
+        await enrollCourse(userId, courseId);
+
+        toast.success('Enrolled Successfully! 🎉');
+
+        navigate(`/courses/${courseId}`);
+
+      } catch (error) {
+
+        const message = error instanceof Error ? error.message : String(error);
+
+        if (message.includes('Already enrolled')) {
+
+          toast.success('You are already enrolled! Redirecting...');
+
+          const currentUserId = user?.id || (user as any)?._id?.toString();
+
+          if (currentUserId) {
+
+            await refetchUserEnrollments(currentUserId);
+
+          }
+
+          navigate(`/courses/${courseId}`);
+
+        } else {
+
+          toast.error('Failed to enroll. Please try again.');
+
+          console.error('Enrollment error:', error);
+
+        }
+
+      } finally {
+
+        setEnrollingCourseId(null);
+
+      }
+
+      return;
+
+    }
+
+    // For paid courses, initiate Razorpay payment
 
     setEnrollingCourseId(courseId);
 
     try {
 
-      await enrollCourse(userId, courseId);
+      await initiatePayment(userId, courseId, () => {
 
-      toast.success('Enrolled Successfully! 🎉');
-
-      navigate(`/courses/${courseId}`);
-
-    } catch (error) {
-
-      const message = error instanceof Error ? error.message : String(error);
-
-      if (message.includes('Already enrolled')) {
-
-        toast.success('You are already enrolled! Redirecting...');
-
-        // Refresh enrollment data to update UI
+        // Success callback - refresh enrollments and navigate
 
         const currentUserId = user?.id || (user as any)?._id?.toString();
 
         if (currentUserId) {
 
-          await refetchUserEnrollments(currentUserId);
+          refetchUserEnrollments(currentUserId);
 
         }
 
         navigate(`/courses/${courseId}`);
 
-      } else {
+      });
 
-        toast.error('Failed to enroll. Please try again.');
+    } catch (error) {
 
-        console.error('Enrollment error:', error);
-
-      }
+      console.error('Payment error:', error);
 
     } finally {
 
@@ -321,16 +374,16 @@ const CoursesPage = () => {
                         <>
                           <Button
                             onClick={() => handleEnroll(course.id)}
-                            disabled={enrollingCourseId === course.id}
+                            disabled={enrollingCourseId === course.id || isPaymentLoading}
                             className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all"
                           >
-                            {enrollingCourseId === course.id ? (
+                            {enrollingCourseId === course.id || isPaymentLoading ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Enrolling...
+                                Processing...
                               </>
                             ) : (
-                              'Enroll Now'
+                              `Enroll Now - ₹${course.price.toLocaleString()}`
                             )}
                           </Button>
                           <Button

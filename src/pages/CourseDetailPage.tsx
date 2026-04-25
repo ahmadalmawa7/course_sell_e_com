@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRazorpay } from '@/hooks/useRazorpay';
 import { RecordedLecture } from '@/data/types';
 import { Button } from '@/components/ui/button';
 import { NotesCard } from '@/components/NotesCard';
+import { PaymentReceipt } from '@/components/PaymentReceipt';
 import {
   Clock, BookOpen, Users, Star, Award, ArrowLeft, CheckCircle,
   Play, FileText, Lock, ChevronDown, ChevronUp, Globe, RefreshCw,
@@ -30,6 +32,7 @@ const CourseDetailPage = () => {
   const { id } = useParams();
   const { user, updateUser } = useAuth();
   const { courses, notes, liveClasses, addCourseReview, isEnrolled, getCourseProgress, refetchUserEnrollments, refetchNotes, enrollCourse } = useData();
+  const { isLoading: isPaymentLoading, initiatePayment } = useRazorpay();
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
   const [expandedModules, setExpandedModules] = useState<number[]>([0]);
   const [reviewText, setReviewText] = useState('');
@@ -78,21 +81,43 @@ const CourseDetailPage = () => {
     const userId = user.id || (user as any)._id?.toString();
     if (!userId) return;
 
+    const course = courses.find(c => c.id === id);
+    if (!course) {
+      toast.error('Course not found');
+      return;
+    }
+
+    // Check for free courses (price 0) - direct enrollment
+    if (course.price === 0) {
+      setIsProcessingEnroll(true);
+      try {
+        await enrollCourse(userId, id);
+        toast.success('Enrolled Successfully 🎉');
+        await refetchUserEnrollments(userId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('Already enrolled')) {
+          toast.success('You are already enrolled in this course!');
+          await refetchUserEnrollments(userId);
+        } else {
+          toast.error('Failed to enroll. Please try again.');
+          console.error('Course detail enrollment error:', error);
+        }
+      } finally {
+        setIsProcessingEnroll(false);
+      }
+      return;
+    }
+
+    // For paid courses, initiate Razorpay payment
     setIsProcessingEnroll(true);
     try {
-      await enrollCourse(userId, id);
-      toast.success('Enrolled Successfully 🎉');
-      await refetchUserEnrollments(userId);
+      await initiatePayment(userId, id, () => {
+        // Success callback - refresh enrollments
+        refetchUserEnrollments(userId);
+      });
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (message.includes('Already enrolled')) {
-        toast.success('You are already enrolled in this course!');
-        // Refresh enrollment data to update UI
-        await refetchUserEnrollments(userId);
-      } else {
-        toast.error('Failed to enroll. Please try again.');
-        console.error('Course detail enrollment error:', error);
-      }
+      console.error('Payment error:', error);
     } finally {
       setIsProcessingEnroll(false);
     }
@@ -213,8 +238,9 @@ const CourseDetailPage = () => {
                 discount={discount}
                 user={user}
                 onEnroll={handleEnroll}
-                isLoading={isProcessingEnroll}
+                isLoading={isProcessingEnroll || isPaymentLoading}
                 progress={progress}
+                userId={userId}
               />
             </div>
           </div>
@@ -223,7 +249,7 @@ const CourseDetailPage = () => {
 
       {/* Mobile Pricing */}
       <div className="md:hidden border-b border-border bg-card px-4 py-4">
-        <PricingCard course={course} isEnrolled={isUserEnrolled} discount={discount} user={user} onEnroll={handleEnroll} isLoading={isProcessingEnroll} progress={progress} />
+        <PricingCard course={course} isEnrolled={isUserEnrolled} discount={discount} user={user} onEnroll={handleEnroll} isLoading={isProcessingEnroll || isPaymentLoading} progress={progress} userId={userId} />
       </div>
 
       {/* Tabs */}
@@ -733,6 +759,7 @@ const PricingCard = ({
   onEnroll,
   isLoading,
   progress,
+  userId,
 }: {
   course: any;
   isEnrolled: boolean;
@@ -741,6 +768,7 @@ const PricingCard = ({
   onEnroll?: () => void;
   isLoading?: boolean;
   progress?: number;
+  userId?: string;
 }) => (
   <div className="rounded-xl border border-border bg-card shadow-xl overflow-hidden">
     {/* Preview image */}
@@ -786,10 +814,10 @@ const PricingCard = ({
         >
           {isLoading ? (
             <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Enrolling...
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...
             </>
           ) : (
-            'Enroll Now'
+            `Enroll Now - ₹${course.price.toLocaleString()}`
           )}
         </Button>
       ) : (
@@ -816,6 +844,11 @@ const PricingCard = ({
           </div>
         ))}
       </div>
+
+      {/* Payment Receipt for enrolled users */}
+      {isEnrolled && userId && (
+        <PaymentReceipt userId={userId} courseId={course.id} />
+      )}
     </div>
   </div>
 );
