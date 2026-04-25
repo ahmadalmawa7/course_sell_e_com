@@ -742,6 +742,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
+
     if (!isAdmin || !user?.email) return;
 
 
@@ -837,6 +838,51 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
   };
+
+  // Load support tickets for the authenticated user
+  useEffect(() => {
+    const fetchSupportTickets = async () => {
+      if (!user?.id) {
+        setSupportTickets([]);
+        return;
+      }
+
+      try {
+        const resp = await fetch(`/api/support/user-tickets/${user.id}`);
+        if (!resp.ok) {
+          setSupportTickets([]);
+          return;
+        }
+        const data = await resp.json();
+        if (!data.success || !Array.isArray(data.tickets)) {
+          setSupportTickets([]);
+          return;
+        }
+
+        const mapped = data.tickets.map((t: any) => {
+          const created = t.createdAt ? new Date(t.createdAt) : new Date();
+          return ({
+            id: t._id || t.id,
+            userId: t.userId || t.userId,
+            userName: t.userName || (user?.name || ''),
+            enrolledCourses: Array.isArray(t.enrolledCourses) ? t.enrolledCourses.map((c: any) => String(c)) : [],
+            subject: t.subject || '',
+            status: t.status || 'open',
+            date: created.toISOString().split('T')[0],
+            time: created.toISOString().split('T')[1].slice(0,8),
+            messages: Array.isArray(t.messages) ? t.messages.map((m: any) => ({ sender: m.sender === 'user' ? 'user' : 'admin', text: m.message || m.text || '', date: m.createdAt ? (new Date(m.createdAt)).toISOString().split('T')[0] : '' })) : [],
+          });
+        });
+
+        setSupportTickets(mapped);
+      } catch (err) {
+        console.error('Failed to fetch support tickets:', err);
+        setSupportTickets([]);
+      }
+    };
+
+    fetchSupportTickets();
+  }, [user?.id]);
 
 
 
@@ -2633,113 +2679,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
-      addSupportTicket: async (t) => {
-        try {
-          const payload = {
-            userId: t.userId,
-            userName: t.userName,
-            subject: t.subject,
-            description: t.description || t.messages?.[0]?.text || '',
-            message: t.messages?.[0]?.text || '',
-            date: t.messages?.[0]?.date || new Date().toISOString().split('T')[0],
-          };
-          const response = await fetch('/api/tickets', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
-          if (response.ok) {
-            const saved = await response.json();
-            setSupportTickets(p => [...p, normalizeBackendTicket(saved)]);
-            return;
-          }
-        } catch (error) {
-          console.error('Failed to create support ticket:', error);
-        }
-        setSupportTickets(p => [...p, t]);
-      },
+      addSupportTicket: (t) => setSupportTickets(p => [...p, t]),
 
 
 
-      addSupportMessage: async (tId, m) => {
-        try {
-          const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(m.sender === 'admin' ? getSupportAdminHeaders() : {}) };
-          const response = await fetch('/api/reply-ticket', {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({ ticketId: tId, sender: m.sender, message: m.text, date: m.date }),
-          });
-          if (response.ok) {
-            const updated = await response.json();
-            setSupportTickets(p => p.map(t => t.id === tId ? normalizeBackendTicket(updated) : t));
-            return;
-          }
-        } catch (error) {
-          console.error('Failed to add support message:', error);
-        }
-        setSupportTickets(p => p.map(t => t.id === tId ? { ...t, messages: [...t.messages, m] } : t));
-      },
+      addSupportMessage: (tId, m) => setSupportTickets(p => p.map(t => t.id === tId ? { ...t, messages: [...t.messages, m] } : t)),
 
 
 
+      closeSupportTicket: (id) => setSupportTickets(p => p.map(t => t.id === id ? { ...t, status: 'closed' } : t)),
 
 
-
-
-      updateSupportTicket: async (ticketId, data) => {
-        try {
-          const headers = { 'Content-Type': 'application/json', ...getSupportAdminHeaders() };
-          const response = await fetch('/api/tickets', {
-            method: 'PATCH',
-            headers,
-            body: JSON.stringify({ id: ticketId, data }),
-          });
-          if (response.ok) {
-            const updated = await response.json();
-            setSupportTickets(p => p.map(t => t.id === ticketId ? normalizeBackendTicket(updated) : t));
-            return;
-          }
-        } catch (error) {
-          console.error('Failed to update support ticket:', error);
-        }
-      },
-
-      deleteSupportTicket: async (ticketId) => {
-        try {
-          const headers = { 'Content-Type': 'application/json', ...getSupportAdminHeaders() };
-          const response = await fetch('/api/delete-ticket', {
-            method: 'DELETE',
-            headers,
-            body: JSON.stringify({ id: ticketId }),
-          });
-          if (response.ok) {
-            setSupportTickets(p => p.filter(t => t.id !== ticketId));
-            return;
-          }
-        } catch (error) {
-          console.error('Failed to delete support ticket:', error);
-        }
-        setSupportTickets(p => p.filter(t => t.id !== ticketId));
-      },
-
-      closeSupportTicket: async (id) => {
-        try {
-          const headers = { 'Content-Type': 'application/json', ...getSupportAdminHeaders() };
-          const response = await fetch('/api/close-ticket', {
-            method: 'PATCH',
-            headers,
-            body: JSON.stringify({ ticketId: id }),
-          });
-          if (response.ok) {
-            const updated = await response.json();
-            setSupportTickets(p => p.map(t => t.id === id ? normalizeBackendTicket(updated) : t));
-            return;
-          }
-        } catch (error) {
-          console.error('Failed to close support ticket:', error);
-        }
-        setSupportTickets(p => p.map(t => t.id === id ? { ...t, status: 'closed' } : t));
-      },
 
       addCategory, updateCategory, deleteCategory,
 

@@ -11,7 +11,7 @@ import SupportChat from '@/components/SupportChat';
 
 const SupportPage = () => {
   const { user } = useAuth();
-  const { supportTickets, addSupportTicket, addSupportMessage } = useData();
+  const { supportTickets, addSupportTicket, addSupportMessage, courses } = useData();
   const [showNew, setShowNew] = useState(false);
   const [newForm, setNewForm] = useState({ subject: '', message: '' });
   const [activeTicket, setActiveTicket] = useState<string | null>(null);
