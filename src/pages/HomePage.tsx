@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowRight, BookOpen, Users, Award, Video, Star, Calendar, Clock, TrendingUp } from 'lucide-react';
+import { ArrowRight, BookOpen, Users, Award, Video, Star, Calendar, Clock, TrendingUp, User } from 'lucide-react';
 import { toast } from 'sonner';
 import EnquiryPopup from '@/components/EnquiryPopup';
 
@@ -148,7 +148,7 @@ const HomePage = () => {
                         <div className={`h-full rounded-full transition-all ${isCompleted ? 'bg-green-500' : 'bg-gold'}`} style={{ width: `${progress}%` }} />
                       </div>
                       {isCompleted && <span className="inline-block rounded-sm bg-green-100 text-green-700 px-2 py-0.5 text-xs font-medium mb-3">✓ Completed</span>}
-                      <Link to={`/learn/${course.id}`}>
+                      <Link to={`/courses/${course.id}`}>
                         <Button variant="outline" size="sm" className="w-full border-primary text-primary text-xs">
                           {isCompleted ? 'Review Course' : 'Continue Learning'}
                         </Button>
@@ -306,8 +306,8 @@ const HomePage = () => {
             <p className="mb-2 text-xs font-medium tracking-[0.3em] text-gold uppercase">Testimonials</p>
             <h2 className="font-heading text-3xl font-bold text-secondary md:text-4xl">What Our Students Say</h2>
           </div>
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {approvedTestimonials.map((t) => (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+            {approvedTestimonials.slice(0, 5).map((t) => (
               <div key={t.id} className="rounded-lg border border-secondary/10 bg-secondary/5 p-6 backdrop-blur-sm">
                 <div className="mb-3 flex gap-0.5">
                   {Array.from({ length: t.rating }).map((_, j) => (
@@ -315,8 +315,21 @@ const HomePage = () => {
                   ))}
                 </div>
                 <p className="mb-4 text-sm text-secondary/80 italic leading-relaxed">"{t.text}"</p>
-                <p className="font-semibold text-secondary text-sm">{t.name}</p>
-                <p className="text-xs text-secondary/60">{t.role}</p>
+                <div className="flex items-center gap-3">
+                  {t.profileImage ? (
+                    <img src={t.profileImage} alt={t.name} className="h-10 w-10 rounded-full object-cover border border-secondary/20" />
+                  ) : (
+                    <div className="h-10 w-10 rounded-full bg-secondary/20 flex items-center justify-center border border-secondary/20">
+                      <User className="h-5 w-5 text-secondary/60" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="font-semibold text-secondary text-sm">{t.name}</p>
+                    {t.courseName && (
+                      <p className="text-xs text-gold">{t.courseName}</p>
+                    )}
+                  </div>
+                </div>
               </div>
             ))}
           </div>
@@ -346,17 +359,19 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="py-16 md:py-20">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="mb-4 font-heading text-3xl font-bold text-foreground md:text-4xl">Begin Your Professional Transformation</h2>
-          <p className="mx-auto mb-8 max-w-xl text-muted-foreground">Join thousands of professionals who have elevated their careers through Erudition Infinite's programs.</p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link to="/register"><Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8">Register Now <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
-            <Link to="/courses"><Button size="lg" variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">Browse Courses</Button></Link>
+      {/* CTA - Only show when user is not logged in */}
+      {!user && (
+        <section className="py-16 md:py-20">
+          <div className="container mx-auto px-4 text-center">
+            <h2 className="mb-4 font-heading text-3xl font-bold text-foreground md:text-4xl">Begin Your Professional Transformation</h2>
+            <p className="mx-auto mb-8 max-w-xl text-muted-foreground">Join thousands of professionals who have elevated their careers through Erudition Infinite's programs.</p>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <Link to="/register"><Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary/90 px-8">Register Now <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
+              <Link to="/courses"><Button size="lg" variant="outline" className="border-primary text-primary hover:bg-primary hover:text-primary-foreground">Browse Courses</Button></Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
       {!user && <EnquiryPopup />}
     </div>
   );

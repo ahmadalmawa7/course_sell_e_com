@@ -24,7 +24,7 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const { user, isAdmin, logout } = useAuth();
   const location = useLocation();
-  const hiddenWhenLoggedIn = ['Live Classes', 'Articles', 'Notes'];
+  const hiddenWhenLoggedIn = ['Live Classes', 'Notes'];
   const visibleNavLinks = navLinks.filter(link => !(user && hiddenWhenLoggedIn.includes(link.label)));
 
   return (

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 import { CourseFormDialog } from "@/components/CourseFormDialog";
 import { RecordedLectureFormDialog } from "@/components/RecordedLectureFormDialog";
+import SupportChat from '@/components/SupportChat';
 
 type Tab = 'overview' | 'courses' | 'classes' | 'students' | 'payments' | 'articles' | 'comments' | 'certificates' | 'notes' | 'testimonials' | 'enquiries' | 'article-requests' | 'support' | 'settings' | 'categories' | 'recorded-lectures';
 
@@ -48,7 +49,7 @@ const AdminPage = () => {
     addCourse, updateCourse, deleteCourse, refetchCourses, addLiveClass, updateLiveClass, deleteLiveClass, refetchLiveClasses,
     addArticle, updateArticle, deleteArticle, deleteComment, replyToComment,
     addNote, updateNote, deleteNote, approveTestimonial, deleteTestimonial, updateEnquiryStatus, deleteEnquiry,
-    addSupportMessage, closeSupportTicket,
+    addSupportMessage, updateSupportTicket, deleteSupportTicket, closeSupportTicket,
     addCategory, updateCategory, deleteCategory,
   } = useData();
   const [adminTestimonials, setAdminTestimonials] = useState<any[]>([]);
@@ -65,10 +66,11 @@ const AdminPage = () => {
   const [categoryForm, setCategoryForm] = useState({ name: '' });
   const [noteDialog, setNoteDialog] = useState(false);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [noteForm, setNoteForm] = useState({ title: '', courseId: '', category: '', description: '', link: '', fileUrl: '' });
+  const [noteForm, setNoteForm] = useState({ title: '', courseId: '', category: '', description: '', externalLink: '', fileUrl: '' });
   const [noteFileUploading, setNoteFileUploading] = useState(false);
   const [noteFileName, setNoteFileName] = useState('');
   const [supportReply, setSupportReply] = useState<{ ticketId: string; text: string } | null>(null);
+  const [expandedSupportTicketId, setExpandedSupportTicketId] = useState<string | null>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any | null>(null);
   const [loadingStudents, setLoadingStudents] = useState(false);
@@ -105,6 +107,7 @@ const AdminPage = () => {
 
     fetchStudents();
   }, [activeTab]);
+
   const [pendingArticles, setPendingArticles] = useState<any[]>([]);
   const [loadingPendingArticles, setLoadingPendingArticles] = useState(false);
   const [loadingApprovedArticles, setLoadingApprovedArticles] = useState(false);
@@ -636,13 +639,14 @@ const AdminPage = () => {
   const resetNoteDialog = () => {
     setNoteDialog(false);
     setEditingNoteId(null);
-    setNoteForm({ title: '', courseId: '', category: '', description: '', link: '', fileUrl: '' });
+    setNoteForm({ title: '', courseId: '', category: '', description: '', externalLink: '', fileUrl: '' });
     setNoteFileName('');
     setNoteFileUploading(false);
   };
 
   const handleAddNote = async () => {
     if (!noteForm.title || !noteForm.courseId) { toast.error('Title and Course are required.'); return; }
+    if (!noteForm.fileUrl && !noteForm.externalLink) { toast.error('Upload a file or provide an external link.'); return; }
     try {
       const response = await fetch('/api/notes', {
         method: 'POST',
@@ -658,7 +662,7 @@ const AdminPage = () => {
       });
       if (response.ok) {
         const data = await response.json();
-        addNote({ id: data.id, ...noteForm, fileUrl: noteForm.fileUrl || noteForm.link || '#', uploadDate: new Date().toISOString().split('T')[0] });
+        addNote({ id: data.id, ...noteForm, fileUrl: noteForm.fileUrl, uploadDate: new Date().toISOString().split('T')[0] });
         toast.success('Note uploaded!');
         resetNoteDialog();
       } else {
@@ -676,7 +680,7 @@ const AdminPage = () => {
       courseId: note.courseId,
       category: note.category || '',
       description: note.description || '',
-      link: note.link || note.fileUrl || '',
+      externalLink: note.externalLink || note.link || '',
       fileUrl: note.fileUrl || '',
     });
     setNoteDialog(true);
@@ -714,7 +718,7 @@ const AdminPage = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setNoteForm(prev => ({ ...prev, fileUrl: data.url, link: prev.link }));
+        setNoteForm(prev => ({ ...prev, fileUrl: data.url, externalLink: prev.externalLink }));
         setNoteFileName(file.name);
         toast.success('File uploaded successfully!');
       } else {
@@ -1566,43 +1570,60 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
             {activeTab === 'support' && (
               <div>
                 <h2 className="mb-6 font-heading text-2xl font-bold text-foreground">Support Tickets</h2>
-                <div className="space-y-3">
-                  {supportTickets.map(t => (
-                    <div key={t.id} className="rounded-lg border border-border bg-card p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <p className="font-medium text-card-foreground">{t.subject}</p>
-                          <p className="text-xs text-muted-foreground">{t.userName} • {t.date}</p>
-                        </div>
-                        <div className="flex gap-1">
-                          <span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${t.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-muted text-muted-foreground'}`}>{t.status}</span>
-                          {t.status === 'open' && (
-                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { closeSupportTicket(t.id); toast.success('Ticket closed.'); }}>Close</Button>
+                {supportTickets.length === 0 ? (
+                  <div className="rounded-lg border border-border bg-card p-6 text-center">
+                    <p className="text-sm text-muted-foreground">No support tickets found.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {supportTickets.map(ticket => {
+                      const expanded = expandedSupportTicketId === ticket.id;
+                      const latest = ticket.messages[ticket.messages.length - 1]?.text || ticket.description || 'No message yet';
+                      return (
+                        <div key={ticket.id} className={`rounded-3xl border p-5 transition ${ticket.status === 'closed' ? 'border-border bg-slate-50/80 opacity-80' : 'bg-card border-border hover:border-primary/60'} `}>
+                          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-card-foreground text-base md:text-lg truncate">{ticket.subject}</p>
+                              <p className="mt-1 text-sm text-muted-foreground">{ticket.userName} • {ticket.date}</p>
+                              <p className="mt-3 text-sm text-muted-foreground line-clamp-2">{latest}</p>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${ticket.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-slate-200 text-slate-600'}`}>{ticket.status}</span>
+                              <Button size="sm" variant={expanded ? 'secondary' : 'outline'} onClick={() => setExpandedSupportTicketId(expanded ? null : ticket.id)}>{expanded ? 'Hide' : 'View'}</Button>
+                              <Button size="sm" variant="outline" onClick={() => { closeSupportTicket(ticket.id); toast.success('Ticket closed.'); }} disabled={ticket.status === 'closed'}>Close</Button>
+                              <Button size="sm" variant="destructive" onClick={() => {
+                                if (confirm('Delete this ticket?')) {
+                                  deleteSupportTicket(ticket.id);
+                                  toast.success('Ticket deleted.');
+                                }
+                              }}>Delete</Button>
+                            </div>
+                          </div>
+
+                          {expanded && (
+                            <div className="mt-5 space-y-4">
+                              <div className="rounded-3xl border border-border bg-background p-4">
+                                <p className="text-sm font-medium text-card-foreground">Description</p>
+                                <p className="mt-2 text-sm text-card-foreground">{ticket.description || 'No description available.'}</p>
+                              </div>
+                              <SupportChat
+                                messages={ticket.messages}
+                                replyText={supportReply?.ticketId === ticket.id ? supportReply.text : ''}
+                                onReplyChange={(value) => setSupportReply({ ticketId: ticket.id, text: value })}
+                                onSubmit={() => {
+                                  setExpandedSupportTicketId(ticket.id);
+                                  handleSupportReply();
+                                }}
+                                disabled={ticket.status === 'closed'}
+                                placeholder="Reply to this ticket"
+                              />
+                            </div>
                           )}
                         </div>
-                      </div>
-                      <div className="space-y-2 mb-3 max-h-40 overflow-y-auto">
-                        {t.messages.map((m, i) => (
-                          <div key={i} className={`rounded-md p-2 text-sm ${m.sender === 'admin' ? 'bg-primary/10 ml-4' : 'bg-muted mr-4'}`}>
-                            <p className="text-xs font-medium text-card-foreground mb-0.5">{m.sender === 'admin' ? 'You (Admin)' : t.userName}</p>
-                            <p className="text-muted-foreground">{m.text}</p>
-                          </div>
-                        ))}
-                      </div>
-                      {t.status === 'open' && (
-                        supportReply?.ticketId === t.id ? (
-                          <div className="flex gap-2">
-                            <Input value={supportReply.text} onChange={e => setSupportReply({ ...supportReply, text: e.target.value })} placeholder="Type reply..." onKeyDown={e => e.key === 'Enter' && handleSupportReply()} />
-                            <Button size="sm" onClick={handleSupportReply}><Send className="h-4 w-4" /></Button>
-                            <Button variant="outline" size="sm" onClick={() => setSupportReply(null)}>Cancel</Button>
-                          </div>
-                        ) : (
-                          <Button variant="outline" size="sm" className="text-xs" onClick={() => setSupportReply({ ticketId: t.id, text: '' })}><Reply className="h-3 w-3 mr-1" /> Reply</Button>
-                        )
-                      )}
-                    </div>
-                  ))}
-                </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1771,8 +1792,8 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                 {noteFileUploading && <p className="mt-2 text-xs text-muted-foreground">Uploading file...</p>}
               </div>
               <div>
-                <label className="text-xs font-medium text-muted-foreground mb-1 block">Link (Google Drive or external)</label>
-                <Input value={noteForm.link} onChange={e => setNoteForm({ ...noteForm, link: e.target.value })} placeholder="https://drive.google.com/..." />
+                <label className="text-xs font-medium text-muted-foreground mb-1 block">External Link (Google Drive or other)</label>
+                <Input value={noteForm.externalLink} onChange={e => setNoteForm({ ...noteForm, externalLink: e.target.value })} placeholder="https://drive.google.com/..." />
               </div>
             </div>
             <p className="text-xs text-muted-foreground">Note: File upload is saved to the database and will be available to users for download.</p>

@@ -28,10 +28,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { db } = await connectToDatabase();
 
     if (req.method === 'POST') {
-      const { title, description, courseId, link, uploadedBy, category, fileUrl } = req.body;
+      const { title, description, courseId, externalLink, uploadedBy, category, fileUrl } = req.body;
 
       if (!title || !courseId || !uploadedBy) {
         return res.status(400).json({ error: 'Missing required fields: title, courseId, uploadedBy' });
+      }
+      if (!fileUrl && !externalLink) {
+        return res.status(400).json({ error: 'Please provide a file or an external link.' });
       }
 
       const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '';
@@ -46,8 +49,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description: description || '',
         courseId: noteCourseId,
         category: category || '',
-        link: link || '',
-        fileUrl: fileUrl || link || '',
+        externalLink: externalLink || '',
+        fileUrl: fileUrl || '',
         uploadedBy,
         createdAt: new Date(),
         uploadDate: new Date().toISOString(),
@@ -61,7 +64,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     if (req.method === 'PUT') {
-      const { id, title, description, courseId, category, link, fileUrl } = req.body;
+      const { id, title, description, courseId, category, externalLink, fileUrl } = req.body;
 
       if (!id) {
         return res.status(400).json({ error: 'Note id is required for update' });
@@ -75,8 +78,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (title !== undefined) updatePayload.title = title;
       if (description !== undefined) updatePayload.description = description;
       if (category !== undefined) updatePayload.category = category;
-      if (link !== undefined) {
-        updatePayload.link = link;
+      if (externalLink !== undefined) {
+        updatePayload.externalLink = externalLink;
       }
       if (fileUrl !== undefined) {
         updatePayload.fileUrl = fileUrl;
@@ -106,8 +109,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         description: updatedNote.description,
         courseId: updatedNote.courseId?.toString ? updatedNote.courseId.toString() : updatedNote.courseId,
         category: updatedNote.category,
-        link: updatedNote.link || '',
-        fileUrl: updatedNote.fileUrl || updatedNote.link || '',
+        externalLink: updatedNote.externalLink || updatedNote.link || '',
+        fileUrl: updatedNote.fileUrl || '',
         uploadedBy: updatedNote.uploadedBy,
         createdAt: updatedNote.createdAt,
         uploadDate: updatedNote.uploadDate || new Date(updatedNote.createdAt).toISOString(),
@@ -117,96 +120,63 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'GET') {
       const { courseId, userId, admin } = req.query;
 
+      const normalizeNote = (note: any, accessible = false) => ({
+        id: note._id.toString(),
+        title: note.title,
+        description: note.description || '',
+        courseId: note.courseId?.toString ? note.courseId.toString() : note.courseId,
+        category: note.category || '',
+        uploadDate: note.uploadDate || new Date(note.createdAt).toISOString(),
+        uploadedBy: note.uploadedBy,
+        createdAt: note.createdAt,
+        accessible,
+        fileUrl: accessible ? note.fileUrl || '' : '',
+        externalLink: accessible ? note.externalLink || note.link || '' : '',
+        link: accessible ? note.link || '' : '',
+      });
+
       if (admin === 'true') {
         if (!isAdminRequest(req)) {
           return res.status(403).json({ error: 'Unauthorized: Admin access required' });
         }
 
         const notes = await db.collection('notes').find({}).sort({ createdAt: -1 }).toArray();
-        const notesWithIds = notes.map(note => ({
-          ...note,
-          id: note._id.toString(),
-          _id: undefined,
-          uploadDate: note.uploadDate || new Date(note.createdAt).toISOString(),
-          fileUrl: note.fileUrl || note.link || '',
-        }));
+        const notesWithIds = notes.map(note => normalizeNote(note, true));
         return res.status(200).json(notesWithIds);
-      }
-
-      if (!userId || typeof userId !== 'string') {
-        return res.status(401).json({ error: 'Please sign up/login to access notes' });
       }
 
       const enrolledCourseIds: string[] = [];
       const enrollmentsCollection = db.collection('enrollments');
       const usersCollection = db.collection('users');
 
-      const userObjectId = ObjectId.isValid(userId) ? new ObjectId(userId) : null;
-
-      if (courseId && typeof courseId === 'string') {
-        const enrollment = userObjectId
-          ? await enrollmentsCollection.findOne({
-              userId: userObjectId,
-              courseId: ObjectId.isValid(courseId) ? new ObjectId(courseId) : courseId,
-            })
-          : null;
-
-        if (!enrollment) {
-          const userDoc = userObjectId
-            ? await usersCollection.findOne({ _id: userObjectId })
-            : null;
-          const userHasCourse = Array.isArray(userDoc?.enrolledCourses)
-            ? userDoc.enrolledCourses.map((c: any) => c?.toString?.()).includes(courseId)
-            : false;
-
-          if (!userHasCourse) {
-            return res.status(403).json({ error: 'Please enroll in the course to access notes' });
+      const userObjectId = userId && typeof userId === 'string' && ObjectId.isValid(userId) ? new ObjectId(userId) : null;
+      if (userObjectId) {
+        const enrollments = await enrollmentsCollection.find({ userId: userObjectId }).toArray();
+        enrollments.forEach(enrollment => {
+          if (enrollment.courseId) {
+            enrolledCourseIds.push(enrollment.courseId.toString());
           }
-        }
+        });
 
-        enrolledCourseIds.push(courseId);
-      } else {
-        if (userObjectId) {
-          const enrollments = await enrollmentsCollection.find({ userId: userObjectId }).toArray();
-          enrollments.forEach(enrollment => {
-            if (enrollment.courseId) {
-              enrolledCourseIds.push(enrollment.courseId.toString());
-            }
+        const userDoc = await usersCollection.findOne({ _id: userObjectId });
+        if (Array.isArray(userDoc?.enrolledCourses)) {
+          userDoc.enrolledCourses.forEach((course: any) => {
+            if (course) enrolledCourseIds.push(course.toString?.() || course);
           });
         }
-
-        if (enrolledCourseIds.length === 0 && userObjectId) {
-          const userDoc = await usersCollection.findOne({ _id: userObjectId });
-          if (Array.isArray(userDoc?.enrolledCourses)) {
-            userDoc.enrolledCourses.forEach((course: any) => {
-              enrolledCourseIds.push(course?.toString?.());
-            });
-          }
-        }
       }
 
-      if (enrolledCourseIds.length === 0) {
-        return res.status(403).json({ error: 'Please enroll in the course to access notes' });
+      const filter: any = {};
+      if (courseId && typeof courseId === 'string') {
+        filter.courseId = ObjectId.isValid(courseId) ? new ObjectId(courseId) : courseId;
       }
 
-      const enrolledCourseObjectIds = enrolledCourseIds
-        .filter(id => ObjectId.isValid(id))
-        .map(id => new ObjectId(id));
-
-      const notes = await db.collection('notes').find({
-        $or: [
-          { courseId: { $in: enrolledCourseIds } },
-          { courseId: { $in: enrolledCourseObjectIds } },
-        ],
-      }).sort({ createdAt: -1 }).toArray();
-      const notesWithIds = notes.map(note => ({
-        ...note,
-        id: note._id.toString(),
-        _id: undefined,
-        courseId: note.courseId?.toString ? note.courseId.toString() : note.courseId,
-        uploadDate: note.uploadDate || new Date(note.createdAt).toISOString(),
-        fileUrl: note.fileUrl || note.link || '',
-      }));
+      const notes = await db.collection('notes').find(filter).sort({ createdAt: -1 }).toArray();
+      const notesWithIds = notes.map(note => {
+        const noteCourseId = note.courseId?.toString ? note.courseId.toString() : note.courseId;
+        const accessible = userId && typeof userId === 'string' ? enrolledCourseIds.includes(noteCourseId) : false;
+        return normalizeNote(note, accessible);
+      });
 
       return res.status(200).json(notesWithIds);
     }

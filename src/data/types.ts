@@ -147,10 +147,12 @@ export interface Note {
   category: string;
   description: string;
   fileUrl: string;
+  externalLink?: string;
   link?: string;
   uploadedBy?: string;
   createdAt?: string;
   uploadDate: string;
+  accessible?: boolean;
 }
 
 export interface Testimonial {
@@ -189,9 +191,11 @@ export interface SupportTicket {
   userId: string;
   userName: string;
   subject: string;
+  description?: string;
   messages: { sender: 'user' | 'admin'; text: string; date: string }[];
   status: 'open' | 'closed';
   date: string;
+  createdAt?: string;
 }
 
 export interface Enrollment {

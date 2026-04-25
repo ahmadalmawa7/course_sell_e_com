@@ -121,7 +121,12 @@ const CourseLearningPage = () => {
           }
           setCourseNotes([]);
         } else {
-          setCourseNotes(Array.isArray(data) ? data : []);
+          setCourseNotes(Array.isArray(data) ? data.map((note: any) => ({
+            ...note,
+            externalLink: note.externalLink || note.link || '',
+            link: note.link || '',
+            fileUrl: note.fileUrl || '',
+          })) : []);
         }
       } catch (error) {
         setNotesError('Failed to load notes');
@@ -334,49 +339,56 @@ const CourseLearningPage = () => {
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {courseNotes.map((note) => (
-                          <div key={note.id} className="rounded-lg border border-border bg-card p-4">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                              <div>
-                                <h3 className="text-base font-semibold text-card-foreground">{note.title}</h3>
-                                <p className="text-sm text-muted-foreground mt-2">{note.description}</p>
-                                <p className="text-xs text-muted-foreground mt-2">{new Date(note.uploadDate).toLocaleString()}</p>
-                              </div>
-                              <div className="flex flex-col items-start gap-2 sm:items-end">
-                                {note.link ? (
-                                  <a
-                                    href={note.link}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1 rounded-full border border-primary px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
-                                  >
-                                    <ExternalLink className="h-3 w-3" /> Click Here
-                                  </a>
-                                ) : null}
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="gap-1 text-xs border-primary text-primary"
-                                  onClick={() => {
-                                    if (note.fileUrl) {
-                                      const a = document.createElement('a');
-                                      a.href = note.fileUrl;
-                                      a.download = `${note.title.replace(/\s+/g, '-')}`;
-                                      a.target = '_blank';
-                                      document.body.appendChild(a);
-                                      a.click();
-                                      document.body.removeChild(a);
-                                    } else if (note.link) {
-                                      window.open(note.link, '_blank');
-                                    }
-                                  }}
-                                >
-                                  <Download className="h-3 w-3" /> Download
-                                </Button>
+                        {courseNotes.map((note) => {
+                          const noteLink = note.externalLink || note.link;
+                          const fileHref = note.fileUrl?.startsWith('/') ? `${window.location.origin}${note.fileUrl}` : note.fileUrl;
+                          return (
+                            <div key={note.id} className="rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-primary/50">
+                              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex items-start gap-4">
+                                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                                    <FileText className="h-5 w-5" />
+                                  </div>
+                                  <div>
+                                    <h3 className="text-base font-semibold text-card-foreground">{note.title}</h3>
+                                    <p className="mt-2 max-w-2xl text-sm text-muted-foreground line-clamp-2">{note.description}</p>
+                                    <p className="mt-3 text-xs text-muted-foreground">{new Date(note.uploadDate).toLocaleString()}</p>
+                                  </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  {note.fileUrl ? (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="gap-2 text-xs border-primary text-primary"
+                                      onClick={() => {
+                                        const a = document.createElement('a');
+                                        a.href = fileHref;
+                                        a.download = `${note.title.replace(/\s+/g, '-')}`;
+                                        a.target = '_blank';
+                                        document.body.appendChild(a);
+                                        a.click();
+                                        document.body.removeChild(a);
+                                      }}
+                                    >
+                                      <Download className="h-3 w-3" /> Download
+                                    </Button>
+                                  ) : null}
+                                  {noteLink ? (
+                                    <a
+                                      href={noteLink}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 rounded-full border border-primary px-3 py-1 text-xs font-semibold text-primary hover:bg-primary/10"
+                                    >
+                                      <ExternalLink className="h-3 w-3" /> Click Here
+                                    </a>
+                                  ) : null}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

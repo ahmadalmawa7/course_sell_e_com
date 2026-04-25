@@ -4,10 +4,11 @@ import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { RecordedLecture } from '@/data/types';
 import { Button } from '@/components/ui/button';
+import { NotesCard } from '@/components/NotesCard';
 import {
   Clock, BookOpen, Users, Star, Award, ArrowLeft, CheckCircle,
   Play, FileText, Lock, ChevronDown, ChevronUp, Globe, RefreshCw,
-  Video, Download, MessageCircle, ThumbsUp, Send, Loader2
+  Video, Download, MessageCircle, ThumbsUp, Send, Loader2, ExternalLink
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -28,7 +29,7 @@ const StarRating = ({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'lg
 const CourseDetailPage = () => {
   const { id } = useParams();
   const { user, updateUser } = useAuth();
-  const { courses, notes, liveClasses, addCourseReview, isEnrolled, getCourseProgress, refetchUserEnrollments, enrollCourse } = useData();
+  const { courses, notes, liveClasses, addCourseReview, isEnrolled, getCourseProgress, refetchUserEnrollments, refetchNotes, enrollCourse } = useData();
   const [activeTab, setActiveTab] = useState<Tab>('Overview');
   const [expandedModules, setExpandedModules] = useState<number[]>([0]);
   const [reviewText, setReviewText] = useState('');
@@ -55,8 +56,22 @@ const CourseDetailPage = () => {
     user && id && (isEnrolled(userId, id) || authEnrolledCourses.includes(id))
   );
   const progress = user && id ? getCourseProgress(userId, id) : 0;
-  const courseNotes = notes.filter((n) => n.courseId === id);
+  const courseNotes = notes
+    .filter((n) => n.courseId === id)
+    .sort((a, b) => new Date(b.uploadDate || b.createdAt || 0).getTime() - new Date(a.uploadDate || a.createdAt || 0).getTime());
   const courseLiveClasses = liveClasses.filter((lc) => lc.courseId === id);
+
+  useEffect(() => {
+    const loadNotes = async () => {
+      if (userId) {
+        await refetchNotes(userId);
+      } else {
+        await refetchNotes();
+      }
+    };
+
+    loadNotes();
+  }, [id, userId, refetchNotes]);
 
   const handleEnroll = async () => {
     if (!user || !id) return;
@@ -604,43 +619,12 @@ const CourseDetailPage = () => {
             {courseNotes.length === 0 ? (
               <div className="rounded-lg border border-border bg-card p-8 text-center">
                 <FileText className="mx-auto mb-3 h-8 w-8 text-muted-foreground" />
-                <p className="text-muted-foreground">No notes uploaded for this course yet.</p>
+                <p className="text-muted-foreground">No Notes Available</p>
               </div>
             ) : (
               <div className="grid gap-4 md:grid-cols-2">
                 {courseNotes.map((note) => (
-                  <div key={note.id} className="flex items-start gap-3 rounded-lg border border-border bg-card p-4 hover:border-gold/50 transition-colors">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                      <FileText className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-card-foreground text-sm mb-0.5">{note.title}</p>
-                      <p className="text-xs text-muted-foreground mb-2 line-clamp-2">{note.description}</p>
-                      <p className="text-xs text-muted-foreground mb-3">{note.uploadDate}</p>
-                      {isEnrolled ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="gap-1 text-xs border-primary text-primary h-7"
-                          onClick={() => {
-                            const content = `${note.title}\n\n${note.description}\n\nErudition Infinite`;
-                            const blob = new Blob([content], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url; a.download = note.title + '.txt'; a.click();
-                            URL.revokeObjectURL(url);
-                            toast.success('Downloaded!');
-                          }}
-                        >
-                          <Download className="h-3 w-3" /> Download
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Lock className="h-3 w-3" /> Enroll to download
-                        </span>
-                      )}
-                    </div>
-                  </div>
+                  <NotesCard key={note.id} note={note} isEnrolled={isUserEnrolled} />
                 ))}
               </div>
             )}
@@ -789,7 +773,7 @@ const PricingCard = ({
       </div>
 
       {isEnrolled ? (
-        <Link to={`/learn/${course.id}`}>
+        <Link to={`/courses/${course.id}`}>
           <Button className="w-full bg-primary text-primary-foreground hover:bg-primary-hover mb-3 gap-1.5 font-semibold">
             {progress === 100 ? 'Review Course' : 'Continue Learning'}
           </Button>

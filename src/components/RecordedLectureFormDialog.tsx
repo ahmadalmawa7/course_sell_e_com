@@ -68,13 +68,13 @@ export function RecordedLectureFormDialog({
         method: 'POST',
         body: formData,
       });
+      const data = await response.json().catch(() => null);
 
       if (response.ok) {
-        const data = await response.json();
-        setForm({ ...form, thumbnail: data.url });
+        setForm({ ...form, thumbnail: data?.url || '' });
         toast.success('Thumbnail uploaded successfully!');
       } else {
-        toast.error('Failed to upload thumbnail');
+        toast.error(data?.error || 'Failed to upload thumbnail');
       }
     } catch (error) {
       console.error('Upload error:', error);

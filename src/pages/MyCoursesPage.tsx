@@ -81,7 +81,7 @@ const MyCoursesPage = () => {
                         <div className={`h-full rounded-full transition-all ${isCompleted ? 'bg-green-500' : 'bg-gold'}`} style={{ width: `${progress}%` }} />
                       </div>
                       {isCompleted && <span className="inline-block rounded-sm bg-green-100 text-green-700 px-2 py-0.5 text-xs font-medium mb-3">✓ Completed</span>}
-                      <Link to={`/learn/${course.id}`}>
+                      <Link to={`/courses/${course.id}`}>
                         <Button variant="outline" size="sm" className="w-full border-primary text-primary text-xs">
                           {isCompleted ? 'Review Course' : 'Continue Learning'}
                         </Button>

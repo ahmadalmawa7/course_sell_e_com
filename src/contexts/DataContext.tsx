@@ -185,16 +185,22 @@ interface DataContextType {
 
 
 
-  addSupportTicket: (t: SupportTicket) => void;
+  addSupportTicket: (t: SupportTicket) => Promise<void>;
 
 
 
-  addSupportMessage: (ticketId: string, message: { sender: 'user' | 'admin'; text: string; date: string }) => void;
+  addSupportMessage: (ticketId: string, message: { sender: 'user' | 'admin'; text: string; date: string }) => Promise<void>;
 
 
 
-  closeSupportTicket: (id: string) => void;
+  closeSupportTicket: (id: string) => Promise<void>;
 
+
+
+  updateSupportTicket: (ticketId: string, data: Partial<Pick<SupportTicket, 'subject' | 'description' | 'status'>>) => Promise<void>;
+
+
+  deleteSupportTicket: (ticketId: string) => Promise<void>;
 
 
   addCategory: (category: string) => void;
@@ -214,6 +220,7 @@ interface DataContextType {
 
 
   refetchUserEnrollments: (userId: string) => Promise<void>;
+  refetchNotes: (userId?: string) => Promise<void>;
 
 
 
@@ -679,6 +686,58 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
+  const normalizeBackendTicket = (ticket: any): SupportTicket => ({
+    id: ticket.id || ticket._id?.toString?.() || '',
+    userId: ticket.userId?.toString?.() || ticket.userId || '',
+    userName: ticket.userName || '',
+    subject: ticket.subject || '',
+    description: ticket.description || '',
+    status: ticket.status === 'closed' ? 'closed' : 'open',
+    messages: Array.isArray(ticket.messages) ? ticket.messages.map((m: any) => ({
+      sender: m.sender === 'admin' ? 'admin' : 'user',
+      text: m.text || m.message || '',
+      date: m.date || (m.createdAt ? new Date(m.createdAt).toISOString().split('T')[0] : ''),
+    })) : [],
+    date: ticket.date || (ticket.createdAt ? new Date(ticket.createdAt).toISOString().split('T')[0] : ''),
+    createdAt: ticket.createdAt ? new Date(ticket.createdAt).toISOString() : undefined,
+  });
+
+  const getSupportAdminHeaders = () => {
+    if (!user?.email) return {};
+    return {
+      'x-admin-email': user.email,
+      'x-admin-password': process.env.NEXT_PUBLIC_ADMIN_PASSWORD || '',
+    };
+  };
+
+  const fetchSupportTickets = async (userId?: string, adminFetch = false) => {
+    try {
+      const endpoint = adminFetch ? '/api/tickets?admin=true' : `/api/tickets?userId=${encodeURIComponent(userId || '')}`;
+      const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(adminFetch ? getSupportAdminHeaders() : {}) };
+      const response = await fetch(endpoint, { headers });
+      if (!response.ok) {
+        throw new Error(`Unable to load support tickets: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setSupportTickets(data.map(normalizeBackendTicket));
+      }
+    } catch (error) {
+      console.error('Failed to fetch support tickets:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isAdmin && user?.email) {
+      fetchSupportTickets(undefined, true);
+    } else if (user?.id) {
+      fetchSupportTickets(user.id, false);
+    } else {
+      setSupportTickets([]);
+    }
+  }, [user?.id, user?.email, isAdmin]);
+
+
   const refetchAdminNotes = async () => {
 
 
@@ -743,7 +802,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
-            fileUrl: item.fileUrl || item.link || '',
+            fileUrl: item.fileUrl || '',
+
+            externalLink: item.externalLink || item.link || '',
 
 
 
@@ -782,6 +843,31 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
+
+  const refetchNotes = async (userId?: string) => {
+    try {
+      const endpoint = userId ? `/api/notes?userId=${encodeURIComponent(userId)}` : '/api/notes';
+      const response = await fetch(endpoint);
+      if (!response.ok) {
+        console.error('Failed to fetch notes:', response.statusText);
+        return;
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        setNotes(data.map((item: any) => ({
+          ...item,
+          id: item.id || item._id?.toString(),
+          courseId: item.courseId?.toString ? item.courseId.toString() : item.courseId,
+          fileUrl: item.fileUrl || '',
+          externalLink: item.externalLink || item.link || '',
+          uploadDate: item.uploadDate || new Date(item.createdAt).toISOString(),
+          accessible: item.accessible ?? false,
+        })));
+      }
+    } catch (error) {
+      console.error('Failed to fetch notes:', error);
+    }
+  };
 
   const refetchUserEnrollments = async (userId: string) => {
 
@@ -919,11 +1005,17 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
-    refetchAdminNotes();
+    if (!isAdmin && user?.id) {
+      refetchNotes(user.id);
+    }
+
+    if (isAdmin) {
+      refetchAdminNotes();
+    }
 
 
 
-  }, [isAdmin, user?.email]);
+  }, [isAdmin, user?.email, user?.id]);
 
 
 
@@ -2541,23 +2633,119 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
-      addSupportTicket: (t) => setSupportTickets(p => [...p, t]),
+      addSupportTicket: async (t) => {
+        try {
+          const payload = {
+            userId: t.userId,
+            userName: t.userName,
+            subject: t.subject,
+            description: t.description || t.messages?.[0]?.text || '',
+            message: t.messages?.[0]?.text || '',
+            date: t.messages?.[0]?.date || new Date().toISOString().split('T')[0],
+          };
+          const response = await fetch('/api/tickets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (response.ok) {
+            const saved = await response.json();
+            setSupportTickets(p => [...p, normalizeBackendTicket(saved)]);
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to create support ticket:', error);
+        }
+        setSupportTickets(p => [...p, t]);
+      },
 
 
 
-      addSupportMessage: (tId, m) => setSupportTickets(p => p.map(t => t.id === tId ? { ...t, messages: [...t.messages, m] } : t)),
+      addSupportMessage: async (tId, m) => {
+        try {
+          const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(m.sender === 'admin' ? getSupportAdminHeaders() : {}) };
+          const response = await fetch('/api/reply-ticket', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({ ticketId: tId, sender: m.sender, message: m.text, date: m.date }),
+          });
+          if (response.ok) {
+            const updated = await response.json();
+            setSupportTickets(p => p.map(t => t.id === tId ? normalizeBackendTicket(updated) : t));
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to add support message:', error);
+        }
+        setSupportTickets(p => p.map(t => t.id === tId ? { ...t, messages: [...t.messages, m] } : t));
+      },
 
 
 
-      closeSupportTicket: (id) => setSupportTickets(p => p.map(t => t.id === id ? { ...t, status: 'closed' } : t)),
 
 
+
+
+      updateSupportTicket: async (ticketId, data) => {
+        try {
+          const headers = { 'Content-Type': 'application/json', ...getSupportAdminHeaders() };
+          const response = await fetch('/api/tickets', {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ id: ticketId, data }),
+          });
+          if (response.ok) {
+            const updated = await response.json();
+            setSupportTickets(p => p.map(t => t.id === ticketId ? normalizeBackendTicket(updated) : t));
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to update support ticket:', error);
+        }
+      },
+
+      deleteSupportTicket: async (ticketId) => {
+        try {
+          const headers = { 'Content-Type': 'application/json', ...getSupportAdminHeaders() };
+          const response = await fetch('/api/delete-ticket', {
+            method: 'DELETE',
+            headers,
+            body: JSON.stringify({ id: ticketId }),
+          });
+          if (response.ok) {
+            setSupportTickets(p => p.filter(t => t.id !== ticketId));
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to delete support ticket:', error);
+        }
+        setSupportTickets(p => p.filter(t => t.id !== ticketId));
+      },
+
+      closeSupportTicket: async (id) => {
+        try {
+          const headers = { 'Content-Type': 'application/json', ...getSupportAdminHeaders() };
+          const response = await fetch('/api/close-ticket', {
+            method: 'PATCH',
+            headers,
+            body: JSON.stringify({ ticketId: id }),
+          });
+          if (response.ok) {
+            const updated = await response.json();
+            setSupportTickets(p => p.map(t => t.id === id ? normalizeBackendTicket(updated) : t));
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to close support ticket:', error);
+        }
+        setSupportTickets(p => p.map(t => t.id === id ? { ...t, status: 'closed' } : t));
+      },
 
       addCategory, updateCategory, deleteCategory,
 
 
 
-      enrollCourse, refetchUserEnrollments, updateProgress, getCourseProgress, getEnrolledCourses, isEnrolled,
+      enrollCourse, refetchUserEnrollments, refetchNotes, updateProgress, getCourseProgress, getEnrolledCourses, isEnrolled,
 
 
 
