@@ -454,6 +454,48 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
 
 
+  useEffect(() => {
+    const fetchPayments = async () => {
+      try {
+        const response = await fetch('/api/payment/receipt?all=true');
+        if (!response.ok) {
+          throw new Error(`Unable to load payments: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (data.success && Array.isArray(data.receipts)) {
+          setPayments(data.receipts.map((item: any) => {
+            const paymentDate = item.paymentDate || item.enrolledAt || item.createdAt || null;
+            return {
+              id: item.paymentId || item.orderId || item.receiptId || `${item.userId}-${item.courseId}-${Date.now()}`,
+              userId: item.userId || '',
+              courseId: item.courseId || '',
+              amount: item.amount || 0,
+              amountInPaise: item.amountInPaise,
+              date: paymentDate ? new Date(paymentDate).toISOString() : new Date().toISOString(),
+              paymentDate: paymentDate ? new Date(paymentDate).toISOString() : undefined,
+              enrolledAt: item.enrolledAt ? new Date(item.enrolledAt).toISOString() : undefined,
+              createdAt: item.createdAt ? new Date(item.createdAt).toISOString() : undefined,
+              status: item.status || 'pending',
+              courseName: item.courseName || '',
+              userName: item.userName || '',
+              userEmail: item.userEmail || '',
+              orderId: item.orderId,
+              paymentId: item.paymentId,
+              receiptId: item.receiptId,
+              signature: item.signature,
+              currency: item.currency,
+            };
+          }));
+        }
+      } catch (error) {
+        console.error('Failed to fetch payments:', error);
+      }
+    };
+
+    fetchPayments();
+  }, []);
+
   // Fetch enquiries from API on mount
 
 

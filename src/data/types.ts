@@ -145,6 +145,8 @@ export interface Payment {
   receiptId?: string;
   signature?: string;
   paymentDate?: string;
+  enrolledAt?: string;
+  createdAt?: string;
   currency?: string;
 }
 

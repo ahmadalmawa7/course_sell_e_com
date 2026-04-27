@@ -308,7 +308,7 @@ const AdminPage = () => {
 
   if (!user || !isAdmin) return <Navigate to="/login" />;
 
-  const totalRevenue = payments.filter(p => p.status === 'completed').reduce((sum, p) => sum + p.amount, 0);
+  const totalRevenue = payments.filter(p => p.status === 'completed' || p.status === 'success').reduce((sum, p) => sum + p.amount, 0);
   const revenueByMonth = [{ month: 'Jan', revenue: 21998 }, { month: 'Feb', revenue: 23998 }, { month: 'Mar', revenue: 16498 }];
   const userGrowth = [{ month: 'Oct', users: 45 }, { month: 'Nov', users: 78 }, { month: 'Dec', users: 120 }, { month: 'Jan', users: 189 }, { month: 'Feb', users: 267 }, { month: 'Mar', users: 312 }];
   const enrollmentsByCategory = courses.map(c => ({ name: c.category, value: c.enrolled })).reduce((acc, item) => {
@@ -1305,77 +1305,6 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                     </table>
                   </div>
                 </div>
-                {loadingStudents ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-                ) : students.length === 0 ? (
-                  <div className="rounded-lg border border-border bg-card p-8 text-center">
-                    <p className="text-muted-foreground">No students found</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="rounded-lg border border-border bg-card overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Name</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Email</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Contact</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Courses Enrolled</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Course Details</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {students.map((student) => (
-                            <tr key={student.id} className="border-t border-border hover:bg-muted/50">
-                              <td className="px-4 py-3 font-medium text-card-foreground">{student.name}</td>
-                              <td className="px-4 py-3 text-muted-foreground">{student.email}</td>
-                              <td className="px-4 py-3 text-muted-foreground">{student.phone}</td>
-                              <td className="px-4 py-3 text-card-foreground">{student.enrolledCoursesCount}</td>
-                              <td className="px-4 py-3">
-                                {student.enrolledCourses.length > 0 ? (
-                                  <div className="space-y-1">
-                                    {student.enrolledCourses.slice(0, 2).map((course: any, idx: number) => (
-                                      <div key={idx} className="flex items-center gap-2">
-                                        <span className="text-xs text-card-foreground truncate max-w-[150px]">{course.courseName}</span>
-                                        <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                          course.status === 'Completed' ? 'bg-green-100 text-green-700' :
-                                          course.status === 'Pursuing' ? 'bg-blue-100 text-blue-700' :
-                                          'bg-yellow-100 text-yellow-700'
-                                        }`}>{course.status}</span>
-                                      </div>
-                                    ))}
-                                    {student.enrolledCourses.length > 2 && (
-                                      <span className="text-xs text-muted-foreground">+{student.enrolledCourses.length - 2} more</span>
-                                    )}
-                                  </div>
-                                ) : (
-                                  <span className="text-xs text-muted-foreground">No courses</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-3">
-                                <span className={`rounded-sm px-2 py-1 text-xs font-medium ${
-                                  student.status === 'Active' ? 'bg-green-100 text-green-700' :
-                                  student.status === 'Completed' ? 'bg-blue-100 text-blue-700' :
-                                  student.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>{student.status}</span>
-                              </td>
-                              <td className="px-4 py-3">
-                                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setSelectedStudent(student)}>
-                                  <Eye className="h-3 w-3 mr-1" /> View
-                                </Button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                )}
 
                 {/* Student Details Dialog */}
                 {selectedStudent && (
@@ -1406,9 +1335,9 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                         </div>
                         <div className="border-t border-border pt-3">
                           <p className="text-sm font-medium mb-2">Enrolled Courses ({selectedStudent.enrolledCoursesCount})</p>
-                          {selectedStudent.enrolledCourses.length > 0 ? (
+                          {(selectedStudent.enrolledCourses?.length ?? 0) > 0 ? (
                             <div className="space-y-2 max-h-48 overflow-y-auto">
-                              {selectedStudent.enrolledCourses.map((course: any, idx: number) => (
+                              {(selectedStudent.enrolledCourses ?? []).map((course: any, idx: number) => (
                                 <div key={idx} className="rounded bg-muted p-2">
                                   <div className="flex items-center justify-between">
                                     <span className="text-sm font-medium">{course.courseName}</span>
@@ -1449,18 +1378,22 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                   <table className="w-full text-sm">
                     <thead className="bg-muted"><tr>
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Student</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Email</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Course</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Amount</th>
-                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Date</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Payment Date</th>
+                      <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Enrolled Date</th>
                       <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Status</th>
                     </tr></thead>
                     <tbody>{payments.map(p => (
                       <tr key={p.id} className="border-t border-border">
                         <td className="px-4 py-2 text-card-foreground">{p.userName}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{p.userEmail || '—'}</td>
                         <td className="px-4 py-2 text-muted-foreground">{p.courseName}</td>
                         <td className="px-4 py-2 font-medium text-card-foreground">₹{p.amount.toLocaleString()}</td>
-                        <td className="px-4 py-2 text-muted-foreground">{p.date}</td>
-                        <td className="px-4 py-2"><span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${p.status === 'completed' ? 'bg-green-100 text-green-700' : p.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{p.status}</span></td>
+                        <td className="px-4 py-2 text-muted-foreground">{p.paymentDate ? new Date(p.paymentDate).toLocaleString() : '—'}</td>
+                        <td className="px-4 py-2 text-muted-foreground">{p.enrolledAt ? new Date(p.enrolledAt).toLocaleDateString() : '—'}</td>
+                        <td className="px-4 py-2"><span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${p.status === 'completed' || p.status === 'success' ? 'bg-green-100 text-green-700' : p.status === 'pending' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{p.status}</span></td>
                       </tr>
                     ))}</tbody>
                   </table>

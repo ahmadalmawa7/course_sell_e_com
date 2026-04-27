@@ -19,7 +19,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     await client.connect();
-    const db = client.db(DB_NAME || 'erudition');
+    const db = client.db(DB_NAME || undefined);
 
     // Update user
     const result = await db.collection('users').updateOne(
