@@ -28,14 +28,10 @@ const transporter = nodemailer.createTransport({
 // Verify transporter configuration on startup
 transporter.verify((error, success) => {
   if (error) {
-    console.error('[Email Transporter] Verification failed:', error.message);
-    console.error('[Email Transporter] Make sure you are using a Gmail App Password, not your regular password');
-    console.error('[Email Transporter] Generate one at: https://myaccount.google.com/apppasswords');
+    console.error('[Email Transporter] Verification failed:', error.message || error);
+    console.error('[Email Transporter] Check your SMTP credentials and server configuration.');
   } else {
-    console.log('[Email Transporter] Ready to send emails');
-    console.error('Email transporter verification failed:', error);
-  } else {
-    console.log('Email server is ready to send messages');
+    console.log('[Email Transporter] Email transporter is ready to send messages');
   }
 });
 
@@ -91,26 +87,17 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
     return true;
   } catch (error: any) {
     console.error('[SendWelcomeEmail] Failed to send email to:', email);
-    console.error('[SendWelcomeEmail] Error:', error.message);
+    console.error('[SendWelcomeEmail] Error:', error instanceof Error ? error.message : error);
 
-    if (error.code === 'EAUTH') {
-      console.error('[SendWelcomeEmail] Authentication failed - Check your EMAIL_USER and EMAIL_PASSWORD');
-      console.error('[SendWelcomeEmail] For Gmail, use an App Password: https://myaccount.google.com/apppasswords');
-    } else if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-      console.error('[SendWelcomeEmail] Network error - Check your internet connection');
+    if (error && typeof error === 'object' && 'code' in error) {
+      if ((error as any).code === 'EAUTH') {
+        console.error('[SendWelcomeEmail] Authentication failed - Check your EMAIL_USER and EMAIL_PASSWORD');
+        console.error('[SendWelcomeEmail] For Gmail, use an App Password: https://myaccount.google.com/apppasswords');
+      } else if ((error as any).code === 'ENOTFOUND' || (error as any).code === 'ECONNREFUSED') {
+        console.error('[SendWelcomeEmail] Network error - Check your internet connection');
+      }
     }
 
-    console.log(`[EMAIL SUCCESS] Welcome email sent to ${email}`);
-    console.log(`[EMAIL INFO] Message ID: ${info.messageId}`);
-    console.log(`[EMAIL INFO] Preview URL: ${nodemailer.getTestMessageUrl(info)}`);
-    return true;
-  } catch (error) {
-    console.error(`[EMAIL ERROR] Failed to send welcome email to ${email}`);
-    console.error('[EMAIL ERROR] Error details:', error);
-    if (error instanceof Error) {
-      console.error('[EMAIL ERROR] Error message:', error.message);
-      console.error('[EMAIL ERROR] Error stack:', error.stack);
-    }
     return false;
   }
 };
