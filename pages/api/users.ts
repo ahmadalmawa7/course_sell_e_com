@@ -82,6 +82,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         phone: user.phone || user.contact || user.mobile || '',
         enrolledCount: courseDetails.length,
         courses: courseDetails,
+        createdAt: user.createdAt || undefined,
       };
     });
 

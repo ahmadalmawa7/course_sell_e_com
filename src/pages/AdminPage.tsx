@@ -80,10 +80,10 @@ const AdminPage = () => {
   const [studentsError, setStudentsError] = useState<string | null>(null);
   const [settings, setSettings] = useState({ razorpayKeyId: '', razorpayKeySecret: '', smtpHost: '', smtpPort: '587', smtpUser: '', smtpPass: '', smtpFrom: 'noreply@eruditioninfinite.com' });
 
-  // Fetch students data when students tab is active
+  // Fetch students data when overview or students tab is active
   useEffect(() => {
     const fetchStudents = async () => {
-      if (activeTab !== 'students') return;
+      if (activeTab !== 'students' && activeTab !== 'overview') return;
 
       setLoadingStudents(true);
       setStudentsError(null);
@@ -111,30 +111,6 @@ const AdminPage = () => {
       setNoteForm((prev) => ({ ...prev, category: prev.category || defaultCategory || '' }));
     }
   }, [categories]);
-
-  useEffect(() => {
-    if (activeTab !== 'students') return;
-
-    const fetchStudents = async () => {
-      setLoadingStudents(true);
-      setStudentsError(null);
-      try {
-        const response = await fetch('/api/users');
-        if (!response.ok) {
-          throw new Error(`Unable to load students: ${response.statusText}`);
-        }
-        const data = await response.json();
-        setStudents(data.users || []);
-      } catch (error) {
-        console.error('Failed to fetch student data:', error);
-        setStudentsError(error instanceof Error ? error.message : 'Failed to fetch student data.');
-      } finally {
-        setLoadingStudents(false);
-      }
-    };
-
-    fetchStudents();
-  }, [activeTab]);
 
   const [pendingArticles, setPendingArticles] = useState<any[]>([]);
   const [loadingPendingArticles, setLoadingPendingArticles] = useState(false);
@@ -308,14 +284,55 @@ const AdminPage = () => {
 
   if (!user || !isAdmin) return <Navigate to="/login" />;
 
+  const totalStudents = students.length;
   const totalRevenue = payments.filter(p => p.status === 'completed' || p.status === 'success').reduce((sum, p) => sum + p.amount, 0);
-  const revenueByMonth = [{ month: 'Jan', revenue: 21998 }, { month: 'Feb', revenue: 23998 }, { month: 'Mar', revenue: 16498 }];
-  const userGrowth = [{ month: 'Oct', users: 45 }, { month: 'Nov', users: 78 }, { month: 'Dec', users: 120 }, { month: 'Jan', users: 189 }, { month: 'Feb', users: 267 }, { month: 'Mar', users: 312 }];
-  const enrollmentsByCategory = courses.map(c => ({ name: c.category, value: c.enrolled })).reduce((acc, item) => {
-    const existing = acc.find(a => a.name === item.name);
-    if (existing) existing.value += item.value; else acc.push({ ...item });
-    return acc;
-  }, [] as { name: string; value: number }[]).slice(0, 5);
+  const totalLiveClasses = liveClasses.length;
+
+  const buildSixMonthSeries = () => {
+    const now = new Date();
+    return Array.from({ length: 6 }, (_, idx) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - 5 + idx, 1);
+      return { key: `${date.getFullYear()}-${date.getMonth()}`, label: date.toLocaleString('default', { month: 'short' }) };
+    }) as Array<{ key: string; label: string }>;
+  };
+
+  const revenueByMonth = (() => {
+    const months = buildSixMonthSeries();
+    const monthMap = Object.fromEntries(months.map((m) => [m.key, { month: m.label, revenue: 0 }]));
+
+    payments.forEach((payment) => {
+      if (payment.status !== 'completed' && payment.status !== 'success') return;
+      const date = payment.paymentDate ? new Date(payment.paymentDate) : payment.createdAt ? new Date(payment.createdAt) : null;
+      if (!date || Number.isNaN(date.getTime())) return;
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      if (monthMap[key]) monthMap[key].revenue += payment.amount;
+    });
+
+    return Object.values(monthMap);
+  })();
+
+  const userGrowth = (() => {
+    const months = buildSixMonthSeries();
+    const monthMap = Object.fromEntries(months.map((m) => [m.key, { month: m.label, users: 0 }]));
+
+    students.forEach((student) => {
+      const date = student.createdAt ? new Date(student.createdAt) : null;
+      if (!date || Number.isNaN(date.getTime())) return;
+      const key = `${date.getFullYear()}-${date.getMonth()}`;
+      if (monthMap[key]) monthMap[key].users += 1;
+    });
+
+    return Object.values(monthMap);
+  })();
+
+  const enrollmentsByCategory = courses
+    .map(c => ({ name: c.category || 'Uncategorized', value: c.enrolled || 0 }))
+    .reduce((acc, item) => {
+      const existing = acc.find(a => a.name === item.name);
+      if (existing) existing.value += item.value; else acc.push({ ...item });
+      return acc;
+    }, [] as { name: string; value: number }[])
+    .slice(0, 5);
   const allComments = articles.flatMap(a => a.comments.map(c => ({ ...c, articleId: a.id, articleTitle: a.title })));
   // categories is now from useData()
 
@@ -1057,10 +1074,10 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                 <h2 className="mb-6 font-heading text-2xl font-bold text-foreground">Dashboard Overview</h2>
                 <div className="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
                   {[
-                    { label: 'Total Students', value: '312', icon: Users },
+                    { label: 'Total Students', value: totalStudents.toString(), icon: Users },
                     { label: 'Total Courses', value: courses.length.toString(), icon: BookOpen },
                     { label: 'Total Revenue', value: `₹${totalRevenue.toLocaleString()}`, icon: CreditCard },
-                    { label: 'Live Classes', value: liveClasses.length.toString(), icon: Calendar },
+                    { label: 'Live Classes', value: totalLiveClasses.toString(), icon: Calendar },
                   ].map(({ label, value, icon: Icon }) => (
                     <div key={label} className="rounded-lg border border-border bg-card p-4">
                       <div className="flex items-center justify-between mb-2">
