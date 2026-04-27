@@ -2,7 +2,7 @@ import nodemailer from 'nodemailer';
 
 // Validate environment variables
 const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD;
+const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD || process.env.EMAIL_PASS;
 
 if (!EMAIL_USER || !EMAIL_PASSWORD) {
   console.error('[Email Config] Missing required environment variables:');
@@ -98,6 +98,55 @@ export const sendWelcomeEmail = async (email: string, name: string) => {
       }
     }
 
+    return false;
+  }
+};
+
+export const sendAdminOtpEmail = async (toEmail: string, otp: string, expirySeconds: number) => {
+  try {
+    if (!EMAIL_USER || !EMAIL_PASSWORD) {
+      console.error('[SendAdminOtpEmail] Cannot send OTP email - missing email configuration');
+      return false;
+    }
+
+    const minutes = Math.ceil(expirySeconds / 60);
+    const mailOptions = {
+      from: `"Erudition Infinite" <${process.env.EMAIL_USER}>`,
+      to: toEmail,
+      subject: 'Your Admin Login OTP',
+      text: `Your OTP code is ${otp}. It expires in ${minutes} minute${minutes > 1 ? 's' : ''}.`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #8B0000 0%, #D4AF37 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+            <h1 style="color: white; margin: 0; font-size: 24px;">Admin OTP Verification</h1>
+          </div>
+          <div style="background: #f9f9f9; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #ddd;">
+            <p style="font-size: 16px; color: #333; line-height: 1.6;">Use the code below to complete your admin login.</p>
+            <p style="font-size: 22px; color: #8B0000; font-weight: 700; letter-spacing: 4px; text-align: center; margin: 24px 0;">${otp}</p>
+            <p style="font-size: 14px; color: #555; line-height: 1.6;">This OTP expires in ${minutes} minute${minutes > 1 ? 's' : ''}. If you did not request this code, please ignore this email.</p>
+            <p style="font-size: 14px; color: #555; line-height: 1.6; margin-top: 18px;">Support email: support@eruditioninfinite.com</p>
+          </div>
+          <div style="text-align: center; margin-top: 20px; font-size: 12px; color: #666;">
+            <p>© 2026 Erudition Infinite. All rights reserved.</p>
+          </div>
+        </div>
+      `,
+    };
+
+    const info = await transporter.sendMail(mailOptions);
+    console.log(`[SendAdminOtpEmail] OTP send result for ${toEmail}:`, {
+      messageId: info.messageId,
+      accepted: info.accepted,
+      rejected: info.rejected,
+      response: info.response,
+    });
+    if (!info.accepted || info.accepted.length === 0) {
+      console.error('[SendAdminOtpEmail] OTP email was not accepted by SMTP server', info);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error('[SendAdminOtpEmail] Failed to send OTP email:', error);
     return false;
   }
 };

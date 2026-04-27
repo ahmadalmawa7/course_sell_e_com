@@ -5,8 +5,11 @@ import { mockUser } from '@/data/mockData';
 interface AuthContextType {
   user: User | null;
   isAdmin: boolean;
+  adminToken: string | null;
   login: (email: string, password: string) => Promise<boolean>;
-  adminLogin: (email: string, password: string) => boolean;
+  adminLogin: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
+  verifyAdminOtp: (email: string, otp: string) => Promise<{ success: boolean; message: string }>;
+  resendAdminOtp: (email: string, password: string) => Promise<{ success: boolean; message: string }>;
   register: (name: string, email: string, password: string) => Promise<boolean>;
   logout: () => void;
   enrollInCourse: (courseId: string) => Promise<void>;
@@ -39,6 +42,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('erudition-admin') === 'true';
   });
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('erudition-admin-token');
+  });
 
   const normalizeEmail = (value: string) => value.trim().toLowerCase();
   const normalizePassword = (value: string) => value.trim();
@@ -56,6 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (res.ok && data.success) {
         setUser(data.user);
         setIsAdmin(false);
+        setAdminToken(null);
         return true;
       }
       console.error('Login failed:', data.message);
@@ -66,21 +74,64 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const adminLogin = (email: string, password: string) => {
-    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-    const adminPassword = process.env.NEXT_PUBLIC_ADMIN_PASSWORD;
-
-    if (!adminEmail || !adminPassword) {
-      console.error('Admin credentials not configured in environment variables');
-      return false;
+  const adminLogin = async (email: string, password: string) => {
+    try {
+      const normalizedEmail = normalizeEmail(email);
+      const normalizedPassword = normalizePassword(password);
+      const res = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password: normalizedPassword }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return { success: true, message: data.message || 'OTP sent' };
+      }
+      return { success: false, message: data.message || 'Invalid credentials' };
+    } catch (error) {
+      console.error('Admin login request failed:', error);
+      return { success: false, message: 'Unable to request admin OTP' };
     }
+  };
 
-    if (email === adminEmail && password === adminPassword) {
-      setIsAdmin(true);
-      setUser({ ...mockUser, name: 'Admin', email });
-      return true;
+  const verifyAdminOtp = async (email: string, otp: string) => {
+    try {
+      const normalizedEmail = normalizeEmail(email);
+      const normalizedOtp = otp.trim();
+      const res = await fetch('/api/admin/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, otp: normalizedOtp }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const verifiedUser = data.user;
+        if (verifiedUser) {
+          setUser({
+            id: verifiedUser.id || verifiedUser._id?.toString() || '',
+            name: verifiedUser.name || 'Admin',
+            email: verifiedUser.email || normalizedEmail,
+            phone: verifiedUser.phone || '',
+            profileImage: verifiedUser.profileImage || '',
+            enrolledCourses: Array.isArray(verifiedUser.enrolledCourses) ? verifiedUser.enrolledCourses : [],
+            completedCourses: Array.isArray(verifiedUser.completedCourses) ? verifiedUser.completedCourses : [],
+            progress: verifiedUser.progress || {},
+            certificates: Array.isArray(verifiedUser.certificates) ? verifiedUser.certificates : [],
+          });
+        }
+        setIsAdmin(true);
+        setAdminToken(data.token || null);
+        return { success: true, message: data.message || 'OTP verified' };
+      }
+      return { success: false, message: data.message || 'Invalid or expired OTP' };
+    } catch (error) {
+      console.error('Admin OTP verification failed:', error);
+      return { success: false, message: 'Unable to verify OTP' };
     }
-    return false;
+  };
+
+  const resendAdminOtp = async (email: string, password: string) => {
+    return adminLogin(email, password);
   };
 
   const register = async (name: string, email: string, password: string) => {
@@ -96,6 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (res.ok && data.success) {
         setUser(data.user);
         setIsAdmin(false);
+        setAdminToken(null);
         return true;
       }
       console.error('Registration failed:', data.message);
@@ -109,9 +161,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = () => {
     setUser(null);
     setIsAdmin(false);
+    setAdminToken(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('erudition-user');
       localStorage.removeItem('erudition-admin');
+      localStorage.removeItem('erudition-admin-token');
     }
   };
 
@@ -196,11 +250,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
+    if (adminToken) {
+      localStorage.setItem('erudition-admin-token', adminToken);
+    } else {
+      localStorage.removeItem('erudition-admin-token');
+    }
+  }, [adminToken]);
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
     localStorage.setItem('erudition-admin', String(isAdmin));
   }, [isAdmin]);
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, login, adminLogin, register, logout, enrollInCourse, updateProgress, updateProfile, updateUser }}>
+    <AuthContext.Provider value={{ user, isAdmin, adminToken, login, adminLogin, verifyAdminOtp, resendAdminOtp, register, logout, enrollInCourse, updateProgress, updateProfile, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

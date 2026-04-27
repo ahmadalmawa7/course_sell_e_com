@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Menu, X, User, LogOut, Shield, BookOpen, FileText, HelpCircle, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -24,6 +24,7 @@ const Navbar = () => {
   const [open, setOpen] = useState(false);
   const { user, isAdmin, logout } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const hiddenWhenLoggedIn = ['Live Classes', 'Notes'];
   const visibleNavLinks = navLinks.filter(link => !(user && hiddenWhenLoggedIn.includes(link.label)));
 
@@ -56,7 +57,7 @@ const Navbar = () => {
             <>
               {isAdmin ? (
                 <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
+                  <DropdownMenuTrigger>
                     <Button variant="outline" size="sm" className="gap-1.5">
                       <Shield className="h-4 w-4" />
                       Admin
@@ -64,14 +65,12 @@ const Navbar = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuItem asChild>
-                      <Link to="/admin" className="flex items-center gap-2 cursor-pointer">
-                        <Shield className="h-4 w-4" />
-                        Admin Panel
-                      </Link>
+                    <DropdownMenuItem onSelect={() => navigate('/admin')} className="flex items-center gap-2 cursor-pointer">
+                      <Shield className="h-4 w-4" />
+                      Admin Panel
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={logout} className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600">
+                    <DropdownMenuItem onSelect={logout} className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600">
                       <LogOut className="h-4 w-4" />
                       Logout
                     </DropdownMenuItem>
@@ -81,7 +80,7 @@ const Navbar = () => {
                 <>
                   <Link to="/dashboard"><Button variant="ghost" size="sm" className="gap-1.5"><User className="h-4 w-4" /> Dashboard</Button></Link>
                   <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
+                    <DropdownMenuTrigger>
                       <Button variant="ghost" size="sm" className="gap-1.5">
                         <User className="h-4 w-4" />
                         {user.name}
@@ -89,27 +88,21 @@ const Navbar = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuItem asChild>
-                        <Link to="/my-courses" className="flex items-center gap-2 cursor-pointer">
-                          <BookOpen className="h-4 w-4" />
-                          My Courses
-                        </Link>
+                      <DropdownMenuItem onSelect={() => navigate('/my-courses')} className="flex items-center gap-2 cursor-pointer">
+                        <BookOpen className="h-4 w-4" />
+                        My Courses
                       </DropdownMenuItem>
-                      <DropdownMenuItem asChild>
-                        <Link to="/support" className="flex items-center gap-2 cursor-pointer">
-                          <HelpCircle className="h-4 w-4" />
-                          Support
-                        </Link>
+                      <DropdownMenuItem onSelect={() => navigate('/support')} className="flex items-center gap-2 cursor-pointer">
+                        <HelpCircle className="h-4 w-4" />
+                        Support
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link to="/profile" className="flex items-center gap-2 cursor-pointer">
-                          <User className="h-4 w-4" />
-                          Profile
-                        </Link>
+                      <DropdownMenuItem onSelect={() => navigate('/profile')} className="flex items-center gap-2 cursor-pointer">
+                        <User className="h-4 w-4" />
+                        Profile
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={logout} className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600">
+                      <DropdownMenuItem onSelect={logout} className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600">
                         <LogOut className="h-4 w-4" />
                         Logout
                       </DropdownMenuItem>
