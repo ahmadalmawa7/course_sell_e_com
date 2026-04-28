@@ -5,9 +5,74 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useData } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { ArrowRight, BookOpen, Users, Award, Video, Star, Calendar, Clock, TrendingUp, User } from 'lucide-react';
+import { ArrowRight, BookOpen, Users, Award, Video, Star, Calendar, Clock, TrendingUp, User, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
 import EnquiryPopup from '@/components/EnquiryPopup';
+
+const SiliconIndiaFeature = () => (
+  <section className="relative overflow-hidden border-y border-gold/20 bg-gradient-to-r from-[hsl(0,0%,10%)] via-[hsl(0,100%,10%)] to-[hsl(0,0%,10%)] py-12">
+    {/* Subtle pattern overlay */}
+    <div
+      className="absolute inset-0 opacity-5"
+      style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%23d4af37' fill-opacity='1'%3E%3Cpath d='M20 20.5V18H0v5h5v5H0v5h20v-2.5h-1.5V28H13v-7.5h5V18h2v2.5zM20 13.5V11H0v5h5v5H0v5h20v-2.5h-1.5V21H13v-7.5h5V11h2v2.5z'/%3E%3C/g%3E%3C/svg%3E")`,
+      }}
+    />
+
+    <div className="container relative mx-auto px-4">
+      <div className="flex flex-col items-center gap-6 md:flex-row md:items-center md:justify-between md:gap-10">
+
+        {/* Left: Badge + Publication */}
+        <div className="flex shrink-0 flex-col items-center gap-3 md:items-start">
+          <div className="flex items-center gap-2 rounded-full border border-gold/40 bg-gold/10 px-4 py-1.5">
+            <Award className="h-4 w-4 text-gold" />
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gold">
+              SiliconIndia Magazine
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map(i => (
+              <Star key={i} className="h-4 w-4 fill-gold text-gold" />
+            ))}
+          </div>
+          <p className="text-xs text-secondary/50">June 2021 · Cover Feature</p>
+        </div>
+
+        {/* Center: Main content */}
+        <div className="flex-1 text-center md:text-left">
+          <p className="mb-1 text-xs font-medium uppercase tracking-[0.3em] text-gold">
+            Featured in SiliconIndia Magazine – June 2021
+          </p>
+          <h2 className="mb-2 font-heading text-xl font-bold text-secondary md:text-2xl">
+            "Striving to guide people and organizations to succeed in their roles and accomplish objectives and long-term life goals."
+          </h2>
+          <p className="text-sm text-secondary/70">
+            Recognized among the{' '}
+            <span className="font-semibold text-gold">
+              10 Most Promising Workforce Development Companies – 2021
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-secondary/50">
+            — Lt Col Shreesh Kumar (Retd), Founder & CEO
+          </p>
+        </div>
+
+        {/* Right: CTA */}
+        <div className="shrink-0">
+          <Link to="/about">
+            <Button
+              variant="outline"
+              className="border-gold text-gold hover:bg-gold hover:text-charcoal gap-2"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Read Full Feature
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  </section>
+);
 
 const HomePage = () => {
   const { courses, liveClasses, articles, getEnrolledCourses, getCourseProgress } = useData();
@@ -162,6 +227,9 @@ const HomePage = () => {
         </section>
       )}
 
+      {/* SiliconIndia Feature */}
+      <SiliconIndiaFeature />
+
       {/* Stats */}
       <section className="border-b border-border bg-background py-12">
         <div className="container mx-auto grid grid-cols-2 gap-6 px-4 md:grid-cols-4">
@@ -179,6 +247,30 @@ const HomePage = () => {
           ))}
         </div>
       </section>
+
+      {/* ── SILICONINDIA RECOGNITION TRUST BAR ── */}
+      <section className="border-b border-border bg-background py-6">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col items-center gap-3 text-center md:flex-row md:justify-center md:gap-6">
+            <p className="text-xs font-medium tracking-[0.2em] text-muted-foreground uppercase">Recognised By</p>
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-5 py-3">
+              <Award className="h-4 w-4 text-gold flex-shrink-0" />
+              <p className="text-sm font-semibold text-card-foreground">
+                Top 10 Workforce Development Companies — SiliconIndia Magazine, June 2021
+              </p>
+              <a
+                href="https://www.siliconindia.com/digital-magazine/workforce-development-companies-june-2021/#page=14"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-primary underline underline-offset-2 hover:text-primary/80 whitespace-nowrap"
+              >
+                View Feature →
+              </a>
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* ── END RECOGNITION TRUST BAR ── */}
 
       {/* About the Institute */}
       <section className="bg-cream py-16 md:py-20">

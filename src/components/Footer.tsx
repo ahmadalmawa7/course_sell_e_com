@@ -19,6 +19,13 @@ const Footer = () => (
           <p className="text-sm text-secondary/70 leading-relaxed">
             A premier institute for corporate training, leadership development, and management consultancy.
           </p>
+          {/* ── SILICONINDIA BADGE ── */}
+          <div className="mt-3 flex items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 rounded border border-secondary/20 px-2.5 py-1 text-xs text-secondary/60">
+              🏆 Top 10 Workforce Development Co. · SiliconIndia 2021
+            </span>
+          </div>
+          {/* ── END BADGE ── */}
         </div>
 
         <div>
