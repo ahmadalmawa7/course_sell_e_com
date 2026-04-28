@@ -815,13 +815,7 @@ const PricingCard = ({
         )}
       </div>
 
-      {isEnrolled ? (
-        <Link to={`/courses/${course.id}`}>
-          <Button className="w-full bg-primary text-primary-foreground hover:bg-primary-hover mb-3 gap-1.5 font-semibold">
-            {progress === 100 ? 'Review Course' : 'Continue Learning'}
-          </Button>
-        </Link>
-      ) : user ? (
+      {!isEnrolled && user && (
         <Button
           onClick={onEnroll}
           disabled={isLoading}
@@ -835,7 +829,8 @@ const PricingCard = ({
             `Enroll Now - ₹${course.price.toLocaleString()}`
           )}
         </Button>
-      ) : (
+      )}
+      {!isEnrolled && !user && (
         <Link to="/login">
           <Button className="w-full bg-primary text-primary-foreground hover:bg-primary-hover mb-3 font-semibold">
             Sign In to Enroll
