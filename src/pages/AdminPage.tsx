@@ -1500,31 +1500,33 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                             <p className="text-xs text-muted-foreground">No recorded lectures for this course</p>
                           </div>
                         ) : (
-                          <div className="rounded-lg border border-border bg-card overflow-hidden">
-                            <table className="w-full text-sm">
+                          <div className="rounded-lg border border-border bg-card overflow-x-auto">
+                            <table className="w-full text-sm table-fixed">
                               <thead className="bg-muted">
                                 <tr>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Module</th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Lecture Title</th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Duration</th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Type</th>
-                                  <th className="px-4 py-2 text-left text-xs font-medium text-muted-foreground">Actions</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[20%]">Module</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[25%]">Lecture Title</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[12%]">Duration</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[10%]">Type</th>
+                                  <th className="px-3 py-2 text-left text-xs font-medium text-muted-foreground w-[33%]">Actions</th>
                                 </tr>
                               </thead>
                               <tbody>
                                 {course.recordedLectures.map((lecture, idx) => (
                                   <tr key={lecture.id} className={idx > 0 ? 'border-t border-border' : ''}>
-                                    <td className="px-4 py-2 text-card-foreground">{lecture.moduleName}</td>
-                                    <td className="px-4 py-2">
+                                    <td className="px-3 py-2 text-card-foreground">
+                                      <p className="line-clamp-2 break-words">{lecture.moduleName}</p>
+                                    </td>
+                                    <td className="px-3 py-2">
                                       <div>
-                                        <p className="text-card-foreground">{lecture.lectureTitle}</p>
+                                        <p className="text-card-foreground line-clamp-2 break-words">{lecture.lectureTitle}</p>
                                         {lecture.description && (
-                                          <p className="text-xs text-muted-foreground mt-0.5 truncate">{lecture.description}</p>
+                                          <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1 break-words">{lecture.description}</p>
                                         )}
                                       </div>
                                     </td>
-                                    <td className="px-4 py-2 text-muted-foreground">{lecture.duration}</td>
-                                    <td className="px-4 py-2">
+                                    <td className="px-3 py-2 text-muted-foreground whitespace-nowrap">{lecture.duration}</td>
+                                    <td className="px-3 py-2">
                                       <span className={`rounded-sm px-2 py-0.5 text-xs font-medium ${
                                         lecture.preview
                                           ? 'bg-blue-100 text-blue-700'
@@ -1533,12 +1535,12 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                                         {lecture.preview ? 'Free' : 'Premium'}
                                       </span>
                                     </td>
-                                    <td className="px-4 py-2">
-                                      <div className="flex gap-1">
+                                    <td className="px-3 py-2">
+                                      <div className="flex gap-1 flex-wrap">
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-7 text-xs"
+                                          className="h-7 text-xs px-2"
                                           onClick={() => setRecordedLectureDialog({ open: true, editing: lecture })}
                                         >
                                           <Pencil className="h-3 w-3 mr-1" /> Edit
@@ -1546,7 +1548,7 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                                         <Button
                                           variant="ghost"
                                           size="sm"
-                                          className="h-7 text-xs text-destructive"
+                                          className="h-7 text-xs px-2 text-destructive"
                                           onClick={() => handleDeleteRecordedLecture(lecture.id)}
                                         >
                                           <Trash2 className="h-3 w-3 mr-1" /> Delete
@@ -1555,7 +1557,7 @@ const handleSaveCategory = async (formData: Record<string, string>) => {
                                           <Button
                                             variant="ghost"
                                             size="sm"
-                                            className="h-7 text-xs text-primary"
+                                            className="h-7 text-xs px-2 text-primary"
                                             onClick={() => window.open(lecture.videoUrl, '_blank')}
                                           >
                                             <ExternalLink className="h-3 w-3 mr-1" /> View

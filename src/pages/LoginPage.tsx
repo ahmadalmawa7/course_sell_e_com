@@ -133,12 +133,6 @@ const LoginPage = () => {
         <p className="mt-3 text-center text-sm text-muted-foreground">
           Don't have an account? <Link to="/register" className="text-primary hover:underline">Register</Link>
         </p>
-        {isAdminLogin && (
-          <p className="mt-2 text-center text-xs text-muted-foreground">Demo: admin@eruditioninfinite.com / admin123</p>
-        )}
-        {!isAdminLogin && (
-          <p className="mt-2 text-center text-xs text-muted-foreground">Demo: any email & password works</p>
-        )}
       </div>
     </div>
   );

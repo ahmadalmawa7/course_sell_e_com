@@ -42,15 +42,17 @@ const Navbar = () => {
           </div>
         </Link>
 
-        {/* Desktop Nav */}
-        <div className="hidden items-center gap-1 lg:flex">
-          {visibleNavLinks.map((link) => (
-            <Link key={link.to} to={link.to}
-              className={`rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted hover:text-primary ${location.pathname === link.to ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
-              {link.label}
-            </Link>
-          ))}
-        </div>
+        {/* Desktop Nav - Hidden for admin */}
+        {!isAdmin && (
+          <div className="hidden items-center gap-1 lg:flex">
+            {visibleNavLinks.map((link) => (
+              <Link key={link.to} to={link.to}
+                className={`rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-muted hover:text-primary ${location.pathname === link.to ? 'text-primary font-semibold' : 'text-muted-foreground'}`}>
+                {link.label}
+              </Link>
+            ))}
+          </div>
+        )}
 
         <div className="hidden items-center gap-2 lg:flex">
           {user ? (
@@ -129,13 +131,13 @@ const Navbar = () => {
       {open && (
         <div className="border-t border-border bg-background p-4 lg:hidden">
           <div className="flex flex-col gap-2">
-            {visibleNavLinks.map((link) => (
+            {!isAdmin && visibleNavLinks.map((link) => (
               <Link key={link.to} to={link.to} onClick={() => setOpen(false)}
                 className={`rounded-md px-3 py-2 text-sm font-medium ${location.pathname === link.to ? 'bg-muted text-primary' : 'text-muted-foreground'}`}>
                 {link.label}
               </Link>
             ))}
-            <hr className="my-2 border-border" />
+            {!isAdmin && <hr className="my-2 border-border" />}
             {user ? (
               <>
                 {!isAdmin && (

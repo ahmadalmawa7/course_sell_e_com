@@ -104,7 +104,7 @@ const HomePage = () => {
           <p className="mx-auto mb-6 max-w-2xl text-lg text-[#F8F8F8] animate-fade-in-up" style={{ animationDelay: '0.2s' }}>
             To deliver training and management solutions to the total satisfaction and delight of the customer and exceed expectations.
           </p>
-          <div className="flex flex-wrap items-center justify-center gap-4 animate-fade-in-up" style={{ animationDelay: '0.3s' }}>
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/courses"><Button size="lg" className="bg-primary text-primary-foreground hover:bg-primary-hover font-semibold px-8">Explore Courses <ArrowRight className="ml-2 h-4 w-4" /></Button></Link>
             <Link to="/about"><Button size="lg" variant="outline" className="border-gold text-gold hover:bg-gold hover:text-charcoal">About Us</Button></Link>
           </div>
@@ -344,7 +344,7 @@ const HomePage = () => {
           {user && (
             <div className="mt-8 text-center">
               {!showFeedback ? (
-                <Button variant="outline" className="border-secondary/30 text-secondary hover:bg-secondary/10" onClick={() => setShowFeedback(true)}>Share Your Feedback</Button>
+                <Button className="bg-gold text-charcoal hover:bg-gold-dark font-semibold px-6" onClick={() => setShowFeedback(true)}>Share Your Feedback</Button>
               ) : (
                 <div className="mx-auto max-w-md rounded-lg bg-secondary/10 p-5 backdrop-blur-sm">
                   <h3 className="font-heading text-base font-semibold text-secondary mb-3">Your Feedback</h3>
@@ -357,8 +357,8 @@ const HomePage = () => {
                   </div>
                   <Textarea value={feedbackForm.text} onChange={e => setFeedbackForm({ ...feedbackForm, text: e.target.value })} placeholder="Share your experience..." rows={3} className="mb-3 bg-secondary/10 border-secondary/20 text-secondary placeholder:text-secondary/40" />
                   <div className="flex gap-2 justify-center">
-                    <Button variant="outline" size="sm" className="border-secondary/30 text-secondary" onClick={() => setShowFeedback(false)}>Cancel</Button>
-                    <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary-hover" onClick={handleFeedback}>Submit</Button>
+                    <Button size="sm" className="bg-secondary/20 text-secondary hover:bg-secondary/30 border border-secondary/30" onClick={() => setShowFeedback(false)}>Cancel</Button>
+                    <Button size="sm" className="bg-gold text-charcoal hover:bg-gold-dark font-semibold" onClick={handleFeedback}>Submit</Button>
                   </div>
                 </div>
               )}
