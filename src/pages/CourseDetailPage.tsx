@@ -600,35 +600,50 @@ const CourseDetailPage = () => {
                 <p className="text-muted-foreground">No live classes scheduled yet.</p>
               </div>
             ) : (
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
                 {courseLiveClasses.map((cls) => (
-                  <div key={cls.id} className="rounded-lg border border-border bg-card p-5">
-                    {cls.thumbnail && (
-                      <div className="mb-3">
-                        <img src={cls.thumbnail} alt={`${cls.title} thumbnail`} className="w-full h-40 object-cover rounded-md" />
-                      </div>
-                    )}
-                    <h3 className="font-heading text-base font-semibold text-card-foreground mb-2">{cls.title}</h3>
-                    <p className="text-sm text-muted-foreground mb-3">{cls.description}</p>
-                    <div className="space-y-1 text-xs text-muted-foreground mb-4">
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="h-3 w-3 text-gold" />
-                        {cls.date} · {cls.time}
-                      </div>
-                      <div className="flex items-center gap-1.5">
-                        <Users className="h-3 w-3 text-gold" />
-                        {cls.instructor}
+                  <div key={cls.id} className="flex items-start gap-4 rounded-lg border border-border p-4 transition-all hover:border-gold/50 hover:shadow-md bg-card">
+                    <div className="relative h-16 w-28 flex-shrink-0 overflow-hidden rounded-lg border border-border bg-muted/10">
+                      {cls.thumbnail ? (
+                        <>
+                          <img src={cls.thumbnail} alt={`${cls.title} thumbnail`} className="h-full w-full object-cover" />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <span className="rounded-full bg-black/30 p-2">
+                              <Video className="h-4 w-4 text-white" />
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center bg-muted/20">
+                          <Video className="h-6 w-6 text-primary" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <h3 className="font-medium text-card-foreground text-sm mb-1">{cls.title}</h3>
+                          <p className="text-xs text-muted-foreground leading-relaxed mb-1">{cls.description}</p>
+                          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                            <Clock className="h-3 w-3 text-gold" />
+                            {cls.date} · {cls.time}
+                          </p>
+                        </div>
+                        <div className="shrink-0">
+                          {isUserEnrolled ? (
+                            <a href={cls.meetLink} target="_blank" rel="noopener noreferrer">
+                              <Button size="sm" className="bg-gold text-charcoal hover:bg-gold-dark font-semibold gap-1.5 text-xs">
+                                <Video className="h-3.5 w-3.5" /> Join
+                              </Button>
+                            </a>
+                          ) : (
+                            <span className="px-2.5 py-1 text-xs font-semibold text-muted-foreground bg-muted rounded flex items-center gap-1">
+                              <Lock className="h-3 w-3" /> Locked
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                    {isUserEnrolled ? (
-                      <a href={cls.meetLink} target="_blank" rel="noopener noreferrer">
-                        <Button size="sm" className="w-full bg-gold text-charcoal hover:bg-gold-dark font-semibold gap-1.5 text-xs">
-                          <Video className="h-3.5 w-3.5" /> Join Google Meet
-                        </Button>
-                      </a>
-                    ) : (
-                      <p className="text-xs text-muted-foreground text-center">Enroll to access live classes</p>
-                    )}
                   </div>
                 ))}
               </div>

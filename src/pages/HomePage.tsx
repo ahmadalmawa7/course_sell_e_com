@@ -241,20 +241,28 @@ const HomePage = () => {
             <p className="mb-2 text-xs font-medium tracking-[0.3em] text-gold uppercase">Interactive Learning</p>
             <h2 className="font-heading text-3xl font-bold text-foreground md:text-4xl">Upcoming Live Classes</h2>
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-6 md:grid-cols-3">
             {upcomingClasses.map((cls) => (
               <Link key={cls.id} to="/live-classes" className="group">
-                <div className="rounded-lg border border-border bg-card p-5 transition-all hover:border-gold/50 hover:shadow-md">
-                  <div className="mb-3">
+                <div className="rounded-lg border border-border bg-card overflow-hidden transition-all hover:border-gold/50 hover:shadow-md">
+                  <div className="relative h-40 bg-muted/20">
                     {cls.thumbnail ? (
-                      <img src={cls.thumbnail} alt={cls.title} className="w-full h-36 object-cover rounded-md border border-border" />
-                    ) : null}
+                      <img src={cls.thumbnail} alt={cls.title} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/5 to-primary/10">
+                        <Video className="h-10 w-10 text-primary/40" />
+                      </div>
+                    )}
+                    <div className="absolute top-3 left-3">
+                      <span className="px-2 py-1 text-xs font-semibold bg-gold/90 text-charcoal rounded-sm">Live</span>
+                    </div>
                   </div>
-                  <h3 className="mb-2 font-heading text-base font-semibold text-card-foreground group-hover:text-primary transition-colors">{cls.title}</h3>
-                  <p className="mb-3 text-sm text-muted-foreground">{cls.description}</p>
-                  <div className="flex flex-col gap-1 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5"><Calendar className="h-3 w-3 text-gold" /> {cls.date}</span>
-                    <span className="flex items-center gap-1.5"><Clock className="h-3 w-3 text-gold" /> {cls.time}</span>
+                  <div className="p-4">
+                    <h3 className="font-heading text-base font-semibold text-card-foreground group-hover:text-primary transition-colors line-clamp-1 mb-2">{cls.title}</h3>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Calendar className="h-3 w-3 text-gold" /> {cls.date}</span>
+                      <span className="flex items-center gap-1"><Clock className="h-3 w-3 text-gold" /> {cls.time}</span>
+                    </div>
                   </div>
                 </div>
               </Link>
