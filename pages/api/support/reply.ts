@@ -40,15 +40,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(403).json({ error: 'Unauthorized: Admin access required' });
     }
 
-    const newMessage = {
+    const newMessage: { sender: 'user' | 'admin'; text: string; date: string } = {
       sender: sender === 'admin' ? 'admin' : 'user',
-      text: message,
+      text: message as string,
       date: date || new Date().toISOString().split('T')[0],
     };
 
     const result = await tickets.findOneAndUpdate(
       { _id: new ObjectId(ticketId) },
-      { $push: { messages: newMessage }, $set: { updatedAt: new Date() } },
+      { $push: { messages: newMessage }, $set: { updatedAt: new Date() } } as any,
       { returnDocument: 'after' }
     );
 

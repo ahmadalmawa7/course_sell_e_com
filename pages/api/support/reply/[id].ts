@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
     const result = await db.collection('support_tickets').findOneAndUpdate(
       query as any,
-      { $push: { messages: newMsg }, $set: { updatedAt: new Date() } },
+      { $push: { messages: newMsg }, $set: { updatedAt: new Date() } } as any,
       { returnDocument: 'after' }
     );
 
